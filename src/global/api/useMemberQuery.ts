@@ -1,16 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLoginStore } from "@/global/stores/useLoginStore";
 import apiClient from "@/global/backend/client";
-import { MemberSummaryResp } from "@/global/types/member.types";
+import { MemberSummaryResp } from "@/global/types/auth.types";
 
 const fetchAllMembers = async (): Promise<MemberSummaryResp[]> => {
-    const { data, error } = await apiClient.GET("/api/v1/find/members");
+    const { data: apiResponse, error } = await apiClient.GET("/api/v1/find/members");
 
     if (error) {
         throw new Error(JSON.stringify(error));
     }
     
-    return data || [];
+    // apiResponse는 ApiResponseWrapper<MemberSummaryResp[]> 타입이므로, 실제 데이터는 apiResponse.data에 있습니다.
+    return apiResponse?.data || [];
 };
 
 export const useMembersQuery = () => {

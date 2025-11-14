@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate:api-types": "curl http://localhost:8080/v3/api-docs -o src/global/backend/openapi.json && npx openapi-typescript src/global/backend/openapi.json --output src/global/backend/schema.d.ts"
   },
   "dependencies": {
     "@lukemorales/query-key-factory": "^1.3.4",

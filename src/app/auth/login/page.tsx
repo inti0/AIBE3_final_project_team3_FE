@@ -2,24 +2,32 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useLogin } from "@/global/api/useAuthQuery";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
-  const [isLoading, setIsLoading] = useState(false);
+  
+  const router = useRouter();
+  const { mutate: login, isPending } = useLogin();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
-    // Mock login process
-    setTimeout(() => {
-      setIsLoading(false);
-      // In real app, handle authentication here
-      alert("Login functionality will be implemented with Spring Boot backend");
-    }, 1000);
+    
+    login(formData, {
+      onSuccess: () => {
+        // 로그인 성공 시 채팅 페이지로 이동
+        router.push("/chat");
+      },
+      onError: (error) => {
+        // 로그인 실패 시 에러 메시지 표시
+        console.error("Login failed:", error);
+        alert(`Login failed: ${error.message}`);
+      },
+    });
   };
 
   return (
@@ -108,10 +116,10 @@ export default function LoginPage() {
           <div>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isPending}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Signing in..." : "Sign in"}
+              {isPending ? "Signing in..." : "Sign in"}
             </button>
           </div>
 
@@ -146,16 +154,6 @@ export default function LoginPage() {
             </div>
           </div>
         </form>
-
-        <div className="mt-8 bg-blue-50 p-4 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-800 mb-2">
-            Demo Account
-          </h3>
-          <p className="text-sm text-blue-700">
-            This is a wireframe. Authentication will be implemented with Spring
-            Boot backend.
-          </p>
-        </div>
       </div>
     </div>
   );

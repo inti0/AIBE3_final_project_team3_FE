@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMembersQuery } from "@/global/api/useMemberQuery";
-import { MemberSummaryResp } from "@/global/types/member.types";
+import { MemberSummaryResp } from "@/global/types/auth.types";
 
 // A simple utility to generate a placeholder avatar
 const getAvatar = (name: string) => `https://i.pravatar.cc/150?u=${name}`;
@@ -83,7 +83,7 @@ export default function FindPage() {
                 INTERESTS
               </p>
               <div className="flex flex-wrap gap-1">
-                {user.interest.split(',').slice(0, 3).map((interest, index) => (
+                {user.interest.slice(0, 3).map((interest, index) => (
                   <span
                     key={index}
                     className="px-2 py-1 bg-emerald-600 text-white text-xs rounded-full"
