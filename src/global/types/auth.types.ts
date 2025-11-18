@@ -13,7 +13,9 @@ export type MemberSummaryResp = components["schemas"]["MemberSummaryResp"];
 export interface LoginState {
   member: MemberSummaryResp | null;
   accessToken: string | null;
+  hasHydrated: boolean;
   setMember: (member: MemberSummaryResp | null) => void;
   setAccessToken: (token: string | null) => void;
   clearAccessToken: () => void;
+  setHydrated: (value: boolean) => void;
 }
