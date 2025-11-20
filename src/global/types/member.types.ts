@@ -10,6 +10,13 @@ export type MemberProfile = MemberProfileUpdateReq & {
   profileImageUrl?: string;
   isFriend?: boolean;
   isPendingRequest?: boolean;
+  isPendingFriendRequestFromMe?: boolean;
+  isPendingFriendRequestFromOpponent?: boolean;
+  isFriendRequestSent?: boolean;
+  receivedFriendRequestId?: number | null;
+  pendingFriendRequestIdFromMe?: number;
+  pendingFriendRequestIdFromOpponent?: number;
+  friendshipId?: number;
   countryCode?: string;
   countryName?: string;
   joinedAt?: string;

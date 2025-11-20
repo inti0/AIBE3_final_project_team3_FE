@@ -36,6 +36,31 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
     return fallback;
 };
 
+const normaliseNumericId = (value: unknown): number | undefined => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === "string" && value.trim().length > 0) {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isNaN(parsed)) {
+            return parsed;
+        }
+    }
+
+    return undefined;
+};
+
+const pickFirstNumericId = (values: unknown[]): number | undefined => {
+    for (const value of values) {
+        const id = normaliseNumericId(value);
+        if (typeof id === "number") {
+            return id;
+        }
+    }
+    return undefined;
+};
+
 const normaliseProfile = (payload: unknown): MemberProfile => {
     const profile = (payload ?? {}) as Record<string, any>;
 
@@ -82,6 +107,60 @@ const normaliseProfile = (payload: unknown): MemberProfile => {
 
     const { code: countryCode, name: countryName } = normaliseCountryValue(profile.country);
 
+    const friendRequestSentFlag = Boolean(
+        profile.isFriendRequestSent ??
+            profile.friendRequestSent ??
+            profile.isPendingFriendRequestFromMe,
+    );
+
+    const receivedFriendRequestId = normaliseNumericId(
+        profile.receivedFriendRequestId ??
+            profile.pendingFriendRequestIdFromOpponent ??
+            profile.friendRequestId ??
+            profile.pendingFriendRequestId,
+    );
+
+    const pendingFromMeCandidates = [
+        profile.pendingFriendRequestIdFromMe,
+        profile.friendRequestIdFromMe,
+        profile.pendingRequestIdFromMe,
+        profile.friendRequestId,
+        profile.pendingFriendRequestId,
+    ];
+
+    const pendingFromOpponentCandidates = [
+        receivedFriendRequestId,
+        profile.pendingFriendRequestIdFromOpponent,
+        profile.friendRequestIdFromOpponent,
+        profile.pendingRequestIdFromOpponent,
+        profile.friendRequestId,
+        profile.pendingFriendRequestId,
+    ];
+
+    let pendingFriendRequestIdFromMe = pickFirstNumericId(pendingFromMeCandidates);
+    let pendingFriendRequestIdFromOpponent = pickFirstNumericId(pendingFromOpponentCandidates);
+    const sharedPendingId = normaliseNumericId(profile.friendRequestId ?? profile.pendingFriendRequestId);
+
+    if (!pendingFriendRequestIdFromMe && sharedPendingId && friendRequestSentFlag) {
+        pendingFriendRequestIdFromMe = sharedPendingId;
+    }
+
+    const isPendingFriendRequestFromOpponent =
+        typeof receivedFriendRequestId === "number"
+            ? true
+            : Boolean(profile.isPendingFriendRequestFromOpponent);
+
+    if (!pendingFriendRequestIdFromOpponent && sharedPendingId && isPendingFriendRequestFromOpponent) {
+        pendingFriendRequestIdFromOpponent = sharedPendingId;
+    }
+
+    const friendshipId = pickFirstNumericId([
+        profile.friendshipId,
+        profile.friendRelationId,
+        profile.friendId,
+        profile.friendMemberId,
+    ]);
+
     return {
         name: profile.name ?? "",
         nickname: profile.nickname ?? "",
@@ -98,6 +177,13 @@ const normaliseProfile = (payload: unknown): MemberProfile => {
         profileImageUrl: typeof profile.profileImageUrl === "string" ? profile.profileImageUrl : undefined,
         isFriend: Boolean(profile.isFriend),
         isPendingRequest: Boolean(profile.isPendingRequest),
+        isPendingFriendRequestFromMe: friendRequestSentFlag,
+        isPendingFriendRequestFromOpponent,
+        isFriendRequestSent: friendRequestSentFlag,
+        receivedFriendRequestId: receivedFriendRequestId ?? null,
+        pendingFriendRequestIdFromMe,
+        pendingFriendRequestIdFromOpponent,
+        friendshipId,
         joinedAt: profile.joinedAt ?? profile.createdAt ?? profile.joinDate,
         totalChats: profile.totalChats ?? profile.chatCount,
         vocabularyLearned: profile.vocabularyLearned,
@@ -123,6 +209,35 @@ export const useMyProfile = () => {
         queryKey: ["member", "me"],
         queryFn: fetchMyProfile,
         enabled: !!accessToken,
+        staleTime: 1000 * 60 * 5,
+        refetchOnWindowFocus: false,
+    });
+};
+
+const fetchMemberProfile = async (memberId: number): Promise<MemberProfile> => {
+    const { data, error } = await apiClient.GET("/api/v1/members/{id}", {
+        params: {
+            path: {
+                id: memberId,
+            },
+        },
+    });
+
+    if (error) {
+        throw new Error(getApiErrorMessage(error, "회원 정보를 불러오지 못했습니다."));
+    }
+
+    const payload = (data ?? {}) as { data?: unknown };
+    return normaliseProfile(payload.data);
+};
+
+export const useMemberProfileQuery = (memberId?: number | null) => {
+    const enabled = typeof memberId === "number" && Number.isFinite(memberId) && memberId > 0;
+
+    return useQuery<MemberProfile, Error>({
+        queryKey: ["member", "profile", memberId],
+        queryFn: () => fetchMemberProfile(memberId as number),
+        enabled,
         staleTime: 1000 * 60 * 5,
         refetchOnWindowFocus: false,
     });
