@@ -1,34 +1,94 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useChatMessagesQuery } from "@/global/api/useChatQuery";
 import { useLoginStore } from "@/global/stores/useLoginStore";
 import { MessageResp } from "@/global/types/chat.types";
 import MessageInput from "./MessageInput";
 import { MoreVertical, Phone, Video, Loader2 } from "lucide-react";
 import { useChatStore } from "@/global/stores/useChatStore";
+import { getStompClient, connect } from "@/global/stomp/stompClient";
+import type { IMessage } from "@stomp/stompjs";
 
 export default function ChatWindow() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { selectedRoomId, rooms } = useChatStore(); // Get selectedRoomId and rooms
-  const member = useLoginStore((state) => state.member); // Correctly get member
+  const { selectedRoomId, rooms } = useChatStore();
+  const member = useLoginStore((state) => state.member);
+  const { accessToken } = useLoginStore();
 
   const selectedRoom = selectedRoomId ? rooms[selectedRoomId.split('-')[0] as '1v1' | 'group' | 'ai']?.find(room => room.id === selectedRoomId) : null;
 
   const roomId = selectedRoom ? Number(selectedRoom.id.split('-')[1]) : 0;
-  const conversationType = selectedRoom?.type || '';
 
-  const { data: chatData, isLoading, error } = useChatMessagesQuery(roomId, conversationType);
+  // Convert frontend type to backend type
+  const chatRoomType = selectedRoom?.type === '1v1' ? 'DIRECT' :
+                       selectedRoom?.type === 'group' ? 'GROUP' :
+                       selectedRoom?.type === 'ai' ? 'AI' : '';
 
-  const messages = chatData?.messages || [];
+  const { data: chatData, isLoading, error } = useChatMessagesQuery(roomId, chatRoomType);
+
+  // State to manage messages locally
+  const [messages, setMessages] = useState<MessageResp[]>([]);
+
+  // Update messages when API data is loaded
+  useEffect(() => {
+    if (chatData?.messages) {
+      setMessages(chatData.messages);
+    }
+  }, [chatData]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // WebSocket subscription for real-time messages
+  useEffect(() => {
+    if (!roomId || !member || !chatRoomType || !accessToken) return;
+
+    let subscription: any;
+
+    connect(accessToken, () => {
+      const client = getStompClient();
+      const destination = `/topic/${chatRoomType.toUpperCase()}/rooms/${roomId}`;
+      subscription = client.subscribe(
+        destination,
+        (message: IMessage) => {
+          const receivedMessage: MessageResp = JSON.parse(message.body);
+          setMessages((prevMessages) => [...prevMessages, receivedMessage]);
+        }
+      );
+      console.log(`Subscribed to ${destination}`);
+    });
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+        console.log(`Unsubscribed from /topic/${chatRoomType.toUpperCase()}/rooms/${roomId}`);
+      }
+    };
+  }, [roomId, member, chatRoomType, accessToken]);
+
   const handleSendMessage = (text: string) => {
-    // TODO: Implement real message sending logic via WebSocket
-    console.log("Sending message:", text);
+    if (text.trim() === "" || !member) {
+      return;
+    }
+
+    const client = getStompClient();
+
+    if (client.connected) {
+      client.publish({
+        destination: "/app/chats/sendMessage",
+        body: JSON.stringify({
+          roomId: roomId,
+          content: text,
+          messageType: "TEXT",
+          chatRoomType: chatRoomType, // Already in uppercase format (DIRECT, GROUP, AI)
+        }),
+      });
+    } else {
+      console.error("Client is not connected.");
+      alert("웹소켓 연결이 활성화되지 않았습니다. 페이지를 새로고침 해주세요.");
+    }
   };
 
   if (!selectedRoom) {
