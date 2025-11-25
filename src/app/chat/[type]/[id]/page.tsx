@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
-import { useChatMessagesQuery } from "@/global/api/useChatQuery";
+import { useChatMessagesQuery, useLeaveChatRoom } from "@/global/api/useChatQuery";
 import { getStompClient, connect, disconnect } from "@/global/stomp/stompClient";
 import { useLoginStore } from "@/global/stores/useLoginStore";
 import { MessageResp } from "@/global/types/chat.types";
@@ -10,13 +10,17 @@ import type { IMessage } from "@stomp/stompjs";
 
 export default function ChatRoomPage() {
   const params = useParams();
-  const conversationType = params.type as string;
+  const chatRoomType = params.type as string;
   const roomId = Number(params.id);
   const member = useLoginStore((state) => state.member);
 
-  const { data, isLoading, error } = useChatMessagesQuery(roomId, conversationType);
+  const { data, isLoading, error } = useChatMessagesQuery(roomId, chatRoomType);
   const [messages, setMessages] = useState<MessageResp[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNotificationOn, setIsNotificationOn] = useState(true);
+
+  const leaveChatRoomMutation = useLeaveChatRoom();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +39,7 @@ export default function ChatRoomPage() {
   }, [messages]);
 
   useEffect(() => {
-    if (!roomId || !member || !conversationType) return;
+    if (!roomId || !member || !chatRoomType) return;
 
     const { accessToken } = useLoginStore.getState();
     if (!accessToken) {
@@ -47,7 +51,7 @@ export default function ChatRoomPage() {
 
     connect(accessToken, () => {
       const client = getStompClient();
-      const destination = `/topic/${conversationType}/rooms/${roomId}`;
+      const destination = `/topic/${chatRoomType}/rooms/${roomId}`;
       subscription = client.subscribe(
         destination,
         (message: IMessage) => {
@@ -61,11 +65,11 @@ export default function ChatRoomPage() {
     return () => {
       if (subscription) {
         subscription.unsubscribe();
-        console.log(`Unsubscribed from /topic/${conversationType}/rooms/${roomId}`);
+        console.log(`Unsubscribed from /topic/${chatRoomType}/rooms/${roomId}`);
       }
       disconnect();
     };
-  }, [roomId, member, conversationType]);
+  }, [roomId, member, chatRoomType]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,14 +87,19 @@ export default function ChatRoomPage() {
           roomId: roomId,
           content: newMessage,
           messageType: "TEXT",
-          senderId: member.memberId,
-          conversationType: conversationType.toUpperCase(),
+          chatRoomType: chatRoomType.toUpperCase(),
         }),
       });
       setNewMessage("");
     } else {
       console.error("Client is not connected.");
       alert("웹소켓 연결이 활성화되지 않았습니다. 페이지를 새로고침 해주세요.");
+    }
+  };
+
+  const handleLeaveChatRoom = () => {
+    if (window.confirm("정말로 이 채팅방을 나가시겠습니까?")) {
+      leaveChatRoomMutation.mutate({ roomId, chatRoomType });
     }
   };
 
@@ -101,8 +110,37 @@ export default function ChatRoomPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <div className="bg-gray-800 p-4 border-b border-gray-700">
-        <h1 className="text-xl font-bold text-white">Chat Room #{roomId} ({conversationType})</h1>
+      <div className="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-white">Chat Room #{roomId} ({chatRoomType})</h1>
+        <div className="relative">
+          <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            </svg>
+          </button>
+          {isMenuOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg z-10">
+              <ul className="py-1 text-white">
+                <li>
+                  <button onClick={() => setIsNotificationOn(!isNotificationOn)} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-600 flex items-center">
+                    <span className="mr-2 text-xl">{isNotificationOn ? '🔔' : '🔕'}</span>
+                    알림
+                  </button>
+                </li>
+                <li><a href="#" className="block px-4 py-2 text-sm hover:bg-gray-600">사진/동영상</a></li>
+                <li><a href="#" className="block px-4 py-2 text-sm hover:bg-gray-600">파일</a></li>
+                <li><a href="#" className="block px-4 py-2 text-sm hover:bg-gray-600">채팅방 인원</a></li>
+                <li><a href="#" className="block px-4 py-2 text-sm hover:bg-gray-600">차단하기</a></li>
+                <li><a href="#" className="block px-4 py-2 text-sm hover:bg-gray-600">신고하기</a></li>
+                <li>
+                  <button onClick={handleLeaveChatRoom} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-600 text-red-400">
+                    채팅방 나가기
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -151,3 +189,4 @@ export default function ChatRoomPage() {
     </div>
   );
 }
+

@@ -20,7 +20,14 @@ export interface GroupChatRoomResp {
   name: string;
   description: string;
   topic: string;
+  hasPassword: boolean;
+  memberCount: number;
+  createdAt: string;
   members: ChatRoomMember[];
+}
+
+export interface JoinGroupChatReq {
+  password?: string;
 }
 
 export interface AIChatRoomResp {
@@ -52,6 +59,6 @@ export type CustomResponse<T> = {
 };
 
 export interface ChatRoomDataResp {
-  conversationType: "DIRECT" | "GROUP" | "AI";
+  chatRoomType: "DIRECT" | "GROUP" | "AI";
   messages: MessageResp[];
 }

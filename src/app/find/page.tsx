@@ -10,6 +10,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageSquare, Users, Bot, Plus } from "lucide-react";
 import NewGroupChatModal from "./components/NewGroupChatModal";
 import GroupRoomList from "./components/GroupRoomList";
+// Import new AI modal components and types
+import AISituationModal from "./components/AISituationModal";
+import AIScenarioModal from "./components/AIScenarioModal";
+import { AICategory, AIScenario } from "./constants/aiSituations";
+
 
 // A simple utility to generate a placeholder avatar
 const getAvatar = (name: string) => `https://i.pravatar.cc/150?u=${name}`;
@@ -71,7 +76,12 @@ export default function FindPage() {
     return normaliseNumericId(raw);
   }, [searchParams]);
   const [activeTab, setActiveTab] = useState<ActiveTab>("1v1");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false); // Renamed for clarity
+  // New state for AI modals
+  const [isAISituationModalOpen, setIsAISituationModalOpen] = useState(false);
+  const [isAIScenarioModalOpen, setIsAIScenarioModalOpen] = useState(false);
+  const [selectedAICategory, setSelectedAICategory] = useState<AICategory | null>(null);
+
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -82,11 +92,39 @@ export default function FindPage() {
 
   const handlePlusClick = () => {
     if (activeTab === "group") {
-      setIsModalOpen(true);
+      setIsGroupModalOpen(true);
     } else if (activeTab === "ai") {
-      console.log("Create new AI chat");
+      setIsAISituationModalOpen(true); // Open the first AI modal
     }
   };
+
+  // Handlers for AI modals
+  const handleSelectAICategory = (category: AICategory) => {
+    setSelectedAICategory(category);
+    setIsAISituationModalOpen(false); // Close first modal
+    setIsAIScenarioModalOpen(true); // Open second modal
+  };
+
+  const handleBackToCategories = () => {
+    setIsAIScenarioModalOpen(false); // Close second modal
+    setIsAISituationModalOpen(true); // Open first modal
+    setSelectedAICategory(null); // Clear selected category
+  };
+
+  const handleSelectAIScenario = (scenario: AIScenario) => {
+    console.log("Selected AI Scenario:", scenario);
+    // TODO: Implement logic to create AI chat room with this scenario
+    alert(`AI 채팅방 생성 요청: ${selectedAICategory?.title} - ${scenario.title}`);
+    setIsAIScenarioModalOpen(false); // Close second modal
+    setSelectedAICategory(null); // Clear selected category
+  };
+
+  const closeAllAIModals = () => {
+    setIsAISituationModalOpen(false);
+    setIsAIScenarioModalOpen(false);
+    setSelectedAICategory(null);
+  };
+
 
   useEffect(() => {
     if (skipAutoSelectRef.current) {
@@ -555,7 +593,7 @@ export default function FindPage() {
           : "text-gray-400 hover:bg-gray-700/50 hover:text-white"
       }`}
     >
-      <Icon size={18} />
+    <Icon size={18} />
       <span className="font-medium">{label}</span>
     </button>
   );
@@ -690,8 +728,23 @@ export default function FindPage() {
       </div>
 
       <NewGroupChatModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isGroupModalOpen} // Use renamed state
+        onClose={() => setIsGroupModalOpen(false)} // Use renamed state
+      />
+
+      {/* New AI Situation Modals */}
+      <AISituationModal
+        isOpen={isAISituationModalOpen}
+        onClose={closeAllAIModals}
+        onSelectCategory={handleSelectAICategory}
+      />
+
+      <AIScenarioModal
+        isOpen={isAIScenarioModalOpen}
+        onClose={closeAllAIModals}
+        onBack={handleBackToCategories}
+        selectedCategory={selectedAICategory}
+        onSelectScenario={handleSelectAIScenario}
       />
     </>
   );

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/global/backend/client";
 import { unwrap } from "@/global/backend/unwrap";
 import { useLoginStore } from "../stores/useLoginStore";
-import { ChatRoomDataResp, DirectChatRoomResp, GroupChatRoomResp, AIChatRoomResp, CreateGroupChatReq } from "../types/chat.types";
+import { ChatRoomDataResp, DirectChatRoomResp, GroupChatRoomResp, AIChatRoomResp, CreateGroupChatReq, JoinGroupChatReq } from "../types/chat.types";
 import { ChatRoomResp } from "@/global/types/chat.types";
 import { useRouter } from "next/navigation";
 
@@ -13,23 +13,23 @@ import { useRouter } from "next/navigation";
 
 const fetchChatMessages = async (
   roomId: number,
-  conversationType: string
+  chatRoomType: string
 ): Promise<ChatRoomDataResp> => {
-  if (!roomId || !conversationType) {
-    return { conversationType: "DIRECT", messages: [] };
+  if (!roomId || !chatRoomType) {
+    return { chatRoomType: "DIRECT", messages: [] };
   }
 
   const response = await apiClient.GET("/api/v1/chats/rooms/{roomId}/messages", {
     params: {
       path: { roomId },
-      query: { conversationType: conversationType.toUpperCase() as "DIRECT" | "GROUP" | "AI" },
+      query: { chatRoomType: chatRoomType.toUpperCase() as "DIRECT" | "GROUP" | "AI" },
     },
   });
 
   // Correctly use unwrap to get the data payload
   const chatData = await unwrap<ChatRoomDataResp>(response);
 
-  return chatData || { conversationType: "DIRECT", messages: [] };
+  return chatData || { chatRoomType: "DIRECT", messages: [] };
 };
 
 const fetchDirectChatRooms = async (): Promise<DirectChatRoomResp[]> => {
@@ -60,14 +60,14 @@ const fetchPublicGroupChatRooms = async (): Promise<GroupChatRoomResp[]> => {
 
 export const useChatMessagesQuery = (
   roomId: number,
-  conversationType: string
+  chatRoomType: string
 ) => {
   const { accessToken } = useLoginStore();
 
   return useQuery<ChatRoomDataResp, Error>({
-    queryKey: ["chatMessages", roomId, conversationType],
-    queryFn: () => fetchChatMessages(roomId, conversationType),
-    enabled: !!accessToken && !!roomId && !!conversationType,
+    queryKey: ["chatMessages", roomId, chatRoomType],
+    queryFn: () => fetchChatMessages(roomId, chatRoomType),
+    enabled: !!accessToken && !!roomId && !!chatRoomType,
     staleTime: 1000 * 60, // 1 minute
     refetchOnWindowFocus: false,
   });
@@ -171,7 +171,7 @@ export const useCreateGroupChat = () => {
     mutationFn: createGroupChat,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["chatRooms", "group"] }); // Invalidate group chat rooms
-      
+
       if (data && data.id) {
         router.push(`/chat/group/${data.id}`); // Navigate to the new group chat
       }
@@ -179,6 +179,90 @@ export const useCreateGroupChat = () => {
     onError: (error) => {
       console.error("Failed to create group chat room:", error);
       alert(`그룹 채팅방을 만드는 데 실패했습니다: ${error.message}`);
+    },
+  });
+};
+
+interface JoinGroupChatVariables {
+  roomId: number;
+  password?: string;
+}
+
+const joinGroupChat = async (variables: JoinGroupChatVariables): Promise<GroupChatRoomResp> => {
+  // 비밀번호가 있고 공백이 아닌 경우에만 전송
+  const trimmedPassword = variables.password?.trim();
+
+  const response = await apiClient.POST("/api/v1/chats/rooms/group/{roomId}/join", {
+    params: {
+      path: { roomId: variables.roomId },
+    },
+    body: trimmedPassword ? { password: trimmedPassword } : undefined,
+  });
+
+  const unwrappedResponse = await unwrap<GroupChatRoomResp>(response);
+
+  if (!unwrappedResponse) {
+    throw new Error("Failed to join group chat room: No data received.");
+  }
+  return unwrappedResponse;
+};
+
+export const useJoinGroupChat = () => {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  return useMutation<GroupChatRoomResp, Error, JoinGroupChatVariables>({
+    mutationFn: joinGroupChat,
+    onSuccess: (data) => {
+      // Invalidate both "my rooms" and "public rooms" queries
+      queryClient.invalidateQueries({ queryKey: ["chatRooms", "group"] });
+      queryClient.invalidateQueries({ queryKey: ["chatRooms", "group", "public"] });
+
+      if (data && data.id) {
+        router.push(`/chat/group/${data.id}`); // Navigate to the joined group chat
+      }
+    },
+    onError: (error) => {
+      console.error("Failed to join group chat room:", error);
+      alert(`그룹 채팅방 참가에 실패했습니다: ${error.message}`);
+    },
+  });
+};
+
+interface LeaveChatRoomVariables {
+  roomId: number;
+  chatRoomType: string;
+}
+
+const leaveChatRoom = async ({ roomId, chatRoomType }: LeaveChatRoomVariables): Promise<void> => {
+  const response = await apiClient.DELETE("/api/v1/chats/rooms/{roomId}", {
+    params: {
+      path: { roomId },
+      query: { chatRoomType: chatRoomType.toUpperCase() as "DIRECT" | "GROUP" | "AI" },
+    },
+  });
+
+  await unwrap(response);
+};
+
+export const useLeaveChatRoom = () => {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  return useMutation<void, Error, LeaveChatRoomVariables>({
+    mutationFn: leaveChatRoom,
+    onSuccess: (_, variables) => {
+      // Invalidate the specific chat room type query
+      queryClient.invalidateQueries({ queryKey: ["chatRooms", variables.chatRoomType.toLowerCase()] });
+      // Also invalidate general chatRooms queries if needed
+      queryClient.invalidateQueries({ queryKey: ["chatRooms"] });
+
+      alert("채팅방을 나갔습니다.");
+      router.push("/chat/user"); // Redirect to the user's chat list
+    },
+    onError: (error) => {
+      console.error("Failed to leave chat room:", error);
+      alert(`채팅방을 나가는 데 실패했습니다: ${error.message}`);
     },
   });
 };
