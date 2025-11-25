@@ -3,12 +3,27 @@
 import { useCreateDirectChat } from "@/global/api/useChatQuery";
 import { useMemberProfileQuery, useMembersQuery } from "@/global/api/useMemberQuery";
 import { useFriendshipActions } from "@/global/hooks/useFriendshipActions";
-import { MemberSummaryResp } from "@/global/types/auth.types";
+import { MemberPresenceSummaryResp } from "@/global/types/auth.types";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MessageSquare, Users, Bot, Plus } from "lucide-react";
+import NewGroupChatModal from "./components/NewGroupChatModal";
+import GroupRoomList from "./components/GroupRoomList";
+// Import new AI modal components and types
+import AISituationModal from "./components/AISituationModal";
+import AIScenarioModal from "./components/AIScenarioModal";
+import { AICategory, AIScenario } from "./constants/aiSituations";
+
 
 // A simple utility to generate a placeholder avatar
 const getAvatar = (name: string) => `https://i.pravatar.cc/150?u=${name}`;
+
+const getPresenceMeta = (isOnline?: boolean) => ({
+  badgeClass: isOnline ? "bg-green-500" : "bg-gray-500",
+  textClass: isOnline ? "text-emerald-400" : "text-gray-400",
+  label: isOnline ? "Online" : "Offline",
+});
 
 type FriendshipState = "FRIEND" | "REQUEST_SENT" | "REQUEST_RECEIVED" | "NONE";
 
@@ -48,9 +63,11 @@ const normaliseNumericId = (value: unknown): number | null => {
   return null;
 };
 
+type ActiveTab = "1v1" | "group" | "ai";
+
 export default function FindPage() {
   const { data: members, isLoading, error } = useMembersQuery();
-  const [selectedUser, setSelectedUser] = useState<MemberSummaryResp | null>(null);
+  const [selectedUser, setSelectedUser] = useState<MemberPresenceSummaryResp | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
   const skipAutoSelectRef = useRef(false);
@@ -58,6 +75,56 @@ export default function FindPage() {
     const raw = searchParams.get("memberId");
     return normaliseNumericId(raw);
   }, [searchParams]);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("1v1");
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false); // Renamed for clarity
+  // New state for AI modals
+  const [isAISituationModalOpen, setIsAISituationModalOpen] = useState(false);
+  const [isAIScenarioModalOpen, setIsAIScenarioModalOpen] = useState(false);
+  const [selectedAICategory, setSelectedAICategory] = useState<AICategory | null>(null);
+
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "group" || tab === "ai") {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const handlePlusClick = () => {
+    if (activeTab === "group") {
+      setIsGroupModalOpen(true);
+    } else if (activeTab === "ai") {
+      setIsAISituationModalOpen(true); // Open the first AI modal
+    }
+  };
+
+  // Handlers for AI modals
+  const handleSelectAICategory = (category: AICategory) => {
+    setSelectedAICategory(category);
+    setIsAISituationModalOpen(false); // Close first modal
+    setIsAIScenarioModalOpen(true); // Open second modal
+  };
+
+  const handleBackToCategories = () => {
+    setIsAIScenarioModalOpen(false); // Close second modal
+    setIsAISituationModalOpen(true); // Open first modal
+    setSelectedAICategory(null); // Clear selected category
+  };
+
+  const handleSelectAIScenario = (scenario: AIScenario) => {
+    console.log("Selected AI Scenario:", scenario);
+    // TODO: Implement logic to create AI chat room with this scenario
+    alert(`AI 채팅방 생성 요청: ${selectedAICategory?.title} - ${scenario.title}`);
+    setIsAIScenarioModalOpen(false); // Close second modal
+    setSelectedAICategory(null); // Clear selected category
+  };
+
+  const closeAllAIModals = () => {
+    setIsAISituationModalOpen(false);
+    setIsAIScenarioModalOpen(false);
+    setSelectedAICategory(null);
+  };
+
 
   useEffect(() => {
     if (skipAutoSelectRef.current) {
@@ -88,11 +155,11 @@ export default function FindPage() {
     status: friendshipActionStatus,
   } = useFriendshipActions();
   const { isSending, isAccepting, isRejecting, isDeleting } = friendshipActionStatus;
-  const viewUserPosts = (user: MemberSummaryResp) => {
+  const viewUserPosts = (user: MemberPresenceSummaryResp) => {
     alert(`${user.nickname}님의 게시글 보기 기능은 추후 제공될 예정입니다.`);
   };
 
-  const startGroupChat = (user: MemberSummaryResp) => {
+  const startGroupChat = (user: MemberPresenceSummaryResp) => {
     alert(`${user.nickname}님과 그룹 챗 기능은 추후 제공될 예정입니다.`);
   };
 
@@ -170,6 +237,7 @@ export default function FindPage() {
   const modalCountryDisplay = modalCountry || "-";
   const modalEnglishLevelDisplay = modalEnglishLevel || "-";
   const modalDescriptionDisplay = modalDescription || "소개 정보가 아직 없습니다.";
+  const modalPresence = getPresenceMeta(selectedUser?.isOnline);
   const isProfilePending = Boolean(selectedUser) && (isProfileLoading || isProfileFetching);
   const hasIncomingFriendRequest = Boolean(
     opponentPendingRequestId ??
@@ -188,7 +256,7 @@ export default function FindPage() {
           : "NONE"
     : undefined;
 
-  const startChat = (user: MemberSummaryResp) => {
+  const startChat = (user: MemberPresenceSummaryResp) => {
     if (window.confirm(`${user.nickname}님과 채팅을 시작하시겠습니까?`)) {
       createChatMutation.mutate({ partnerId: user.id });
     }
@@ -393,7 +461,7 @@ export default function FindPage() {
     if (isLoading) {
       return (
         <div className="text-center text-white">
-          <p>Loading users...</p>
+          <p>Loading...</p>
         </div>
       );
     }
@@ -401,105 +469,165 @@ export default function FindPage() {
     if (error) {
       return (
         <div className="text-center text-red-400">
-          <p>Error loading users: {error.message}</p>
+          <p>Error loading: {error.message}</p>
         </div>
       );
     }
 
-    if (!members || members.length === 0) {
+    if (activeTab === "1v1") {
+      if (!members || members.length === 0) {
+        return (
+          <div className="text-center text-gray-400">
+            <p>No users found.</p>
+          </div>
+        );
+      }
+
       return (
-        <div className="text-center text-gray-400">
-          <p>No users found.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {members.map((user) => {
+            const presence = getPresenceMeta(user.isOnline);
+
+            return (
+              <div
+                key={user.id}
+                className="bg-gray-800 border border-gray-600 rounded-lg p-6 hover:border-emerald-500 transition-all duration-300 cursor-pointer"
+                onClick={() => setSelectedUser(user)}
+              >
+                <div className="flex items-center mb-4">
+                  <div className="relative w-16 h-16">
+                    <Image
+                      src={getAvatar(user.nickname)}
+                      alt={user.name || "사용자 아바타"}
+                      width={64}
+                      height={64}
+                      unoptimized
+                      className="rounded-full object-cover w-16 h-16"
+                    />
+                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 border-2 border-gray-800 rounded-full ${presence.badgeClass}`}></div>
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-lg font-semibold text-white">
+                      {user.nickname}
+                    </h3>
+                    <p className={`${presence.textClass} text-sm flex items-center`}>
+                      <span className={`w-2 h-2 rounded-full mr-2 ${presence.badgeClass}`}></span>
+                      {presence.label}
+                    </p>
+                    <p className="text-gray-400 text-sm">{user.country}</p>
+                  </div>
+                </div>
+
+                <p className="text-gray-300 text-sm mb-3 line-clamp-2">
+                  {user.description}
+                </p>
+
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-gray-400 mb-1">
+                    INTERESTS
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {user.interests.slice(0, 3).map((interest, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 bg-emerald-600 text-white text-xs rounded-full"
+                      >
+                        {interest.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startChat(user);
+                    }}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
+                  >
+                    Start Chat
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      viewUserPosts(user);
+                    }}
+                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
+                  >
+                    게시글 보러가기
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       );
+    }
+
+    if (activeTab === "group") {
+      return <GroupRoomList />;
     }
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {members.map((user) => (
-          <div
-            key={user.id}
-            className="bg-gray-800 border border-gray-600 rounded-lg p-6 hover:border-emerald-500 transition-all duration-300 cursor-pointer"
-            onClick={() => setSelectedUser(user)}
-          >
-            <div className="flex items-center mb-4">
-              <div className="relative">
-                <img
-                  src={getAvatar(user.nickname)}
-                  alt={user.name}
-                  className="w-16 h-16 rounded-full object-cover"
-                />
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-2 border-gray-800 rounded-full"></div>
-              </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-white">
-                  {user.nickname}
-                </h3>
-                <p className="text-emerald-400 text-sm flex items-center">
-                  <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                  Online
-                </p>
-                <p className="text-gray-400 text-sm">{user.country}</p>
-              </div>
-            </div>
-
-            <p className="text-gray-300 text-sm mb-3 line-clamp-2">
-              {user.description}
-            </p>
-
-            <div className="mb-3">
-              <p className="text-xs font-semibold text-gray-400 mb-1">
-                INTERESTS
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {user.interests.slice(0, 3).map((interest, index) => (
-                  <span
-                    key={index}
-                    className="px-2 py-1 bg-emerald-600 text-white text-xs rounded-full"
-                  >
-                    {interest.trim()}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startChat(user);
-                }}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
-              >
-                Start Chat
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  viewUserPosts(user);
-                }}
-                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
-              >
-                게시글 보러가기
-              </button>
-            </div>
-          </div>
-        ))}
+      <div className="text-center text-gray-400 mt-10">
+        <p className="text-xl">Content for {activeTab} tab is coming soon!</p>
       </div>
     );
   };
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-4 text-white">Find People</h1>
-        <p className="text-gray-300">
-          Discover online users and start conversations to practice English
-          together
-        </p>
-      </div>
+  const TabButton = ({
+    tab,
+    label,
+    Icon,
+  }: {
+    tab: ActiveTab;
+    label: string;
+    Icon: React.ElementType;
+  }) => (
+    <button
+      onClick={() => setActiveTab(tab)}
+      className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors ${
+        activeTab === tab
+          ? "bg-gray-800 text-emerald-400"
+          : "text-gray-400 hover:bg-gray-700/50 hover:text-white"
+      }`}
+    >
+    <Icon size={18} />
+      <span className="font-medium">{label}</span>
+    </button>
+  );
 
-      {renderContent()}
+  return (
+    <>
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2 text-white">Find</h1>
+          <p className="text-gray-300">
+            Discover new people, groups, and AI to practice English with.
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-gray-700 mb-8">
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              <TabButton tab="1v1" label="People" Icon={MessageSquare} />
+              <TabButton tab="group" label="Groups" Icon={Users} />
+              <TabButton tab="ai" label="AI Tutors" Icon={Bot} />
+            </div>
+            {(activeTab === "group" || activeTab === "ai") && (
+              <button
+                onClick={handlePlusClick}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <Plus size={22} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {renderContent()}
 
       {/* User Profile Modal */}
       {selectedUser && (
@@ -508,19 +636,22 @@ export default function FindPage() {
             <div className="p-6">
               <div className="flex justify-between items-start mb-6">
                 <div className="flex items-center">
-                  <div className="relative">
-                    <img
+                  <div className="relative w-20 h-20">
+                    <Image
                       src={getAvatar(modalNickname || selectedUser.nickname)}
-                      alt={modalDisplayName || selectedUser.nickname}
-                      className="w-20 h-20 rounded-full object-cover"
+                      alt={modalDisplayName || selectedUser.nickname || "회원 아바타"}
+                      width={80}
+                      height={80}
+                      unoptimized
+                      className="rounded-full object-cover w-20 h-20"
                     />
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 border-2 border-gray-800 rounded-full"></div>
+                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 border-2 border-gray-800 rounded-full ${modalPresence.badgeClass}`}></div>
                   </div>
                   <div className="ml-4">
                     <h2 className="text-2xl font-bold text-white">{modalDisplayName}</h2>
-                    <p className="text-emerald-400 flex items-center">
-                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                      Online now
+                    <p className={`${modalPresence.textClass} flex items-center`}>
+                      <span className={`w-2 h-2 rounded-full mr-2 ${modalPresence.badgeClass}`}></span>
+                      {modalPresence.label}
                     </p>
                     <p className="text-gray-400">{modalCountryDisplay}</p>
                     <p className="text-gray-400 text-sm">{modalEnglishLevelDisplay}</p>
@@ -594,6 +725,27 @@ export default function FindPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+
+      <NewGroupChatModal
+        isOpen={isGroupModalOpen} // Use renamed state
+        onClose={() => setIsGroupModalOpen(false)} // Use renamed state
+      />
+
+      {/* New AI Situation Modals */}
+      <AISituationModal
+        isOpen={isAISituationModalOpen}
+        onClose={closeAllAIModals}
+        onSelectCategory={handleSelectAICategory}
+      />
+
+      <AIScenarioModal
+        isOpen={isAIScenarioModalOpen}
+        onClose={closeAllAIModals}
+        onBack={handleBackToCategories}
+        selectedCategory={selectedAICategory}
+        onSelectScenario={handleSelectAIScenario}
+      />
+    </>
   );
 }
