@@ -196,6 +196,12 @@ export default function Header() {
             >
               My Page
             </Link>
+            <Link
+              href="/admin/report-management"
+              className="text-red-400 hover:text-red-300 transition-colors font-semibold"
+            >
+              Admin
+            </Link>
           </nav>
 
           {/* Auth Buttons */}
@@ -521,6 +527,12 @@ export default function Header() {
                 className="text-gray-200 hover:text-emerald-400 transition-colors py-2"
               >
                 My Page
+              </Link>
+              <Link
+                href="/admin/report-management"
+                className="text-red-400 font-semibold hover:text-red-300 transition-colors py-2"
+              >
+                Admin
               </Link>
               {hasHydrated && (isLoggedIn ? (
                 <button

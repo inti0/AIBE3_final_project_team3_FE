@@ -183,7 +183,6 @@ export default function LearningNotesPage() {
             문장 미니게임 시작하기 →
           </button>
         </div>
-        {/* ⭐⭐⭐⭐⭐ 여기까지가 추가된 부분 ⭐⭐⭐⭐⭐ */}
 
         <div className="flex justify-between mb-6">
           <div className="flex gap-3">
