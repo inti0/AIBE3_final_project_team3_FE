@@ -8,11 +8,19 @@ import { unwrap } from "../backend/unwrap"; // 응답 처리 헬퍼
 
 // 1) 학습노트 목록 조회 (문장게임 등록용)
 export async function fetchSentenceGameNoteList(page: number) {
+  const pageToSend = page + 1;
+
   const res = await apiClient.GET("/api/v1/admin/sentence-game/notes", {
-    params: { page, size: 20 },
+    params: {
+      query: {
+        page: pageToSend,
+        size: 20
+      }
+    }
   });
+
   return res.data.data;
-}
+} 
 
 // 2) 문장게임 문장 등록
 export async function createSentenceGame(data: {
@@ -26,9 +34,12 @@ export async function createSentenceGame(data: {
 
 // 3) 문장게임 목록 조회
 export async function fetchSentenceGameList(page: number) {
-  const res = await apiClient.GET("/api/v1/admin/sentence-game", {
-    params: { page, size: 20 },
-  });
+const pageToSend = page + 1;
+
+const res = await apiClient.GET("/api/v1/admin/sentence-game",{
+    params: {query :{ page:pageToSend, size: 20 }},
+    }
+  );
   return unwrap(res);
 }
 
