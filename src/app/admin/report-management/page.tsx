@@ -32,6 +32,7 @@ export default function ReportManagementPage() {
   const list = reports ?? [];
 
   return (
+    <AdminGuard>
     <main className="max-w-6xl mx-auto p-8">
       
       <h1 className="text-3xl font-bold mb-6">신고 관리</h1>
@@ -194,5 +195,6 @@ export default function ReportManagementPage() {
         </div>
       )}
     </main>
+    </AdminGuard>
   );
 }
