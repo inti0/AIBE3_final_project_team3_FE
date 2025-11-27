@@ -59,12 +59,10 @@ const mapTag = (tag: string) => {
 // ==========================================
 
 const fetchNotes = async (tag: string, filter: string, page: number) => {
-  const pageToSend = page + 1;
-
   const q = new URLSearchParams();
   q.set("tag", mapTag(tag));
   q.set("learningFilter", mapFilter(filter));
-  q.set("page", String(pageToSend));    
+  q.set("page", String(page));    
   q.set("size", "20");          
 
   const resp = await client.GET(`/api/v1/learning-notes?${q.toString()}`, {});
