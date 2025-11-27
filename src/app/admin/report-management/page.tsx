@@ -6,6 +6,7 @@ import {
   useReportStatusMutation,
 } from "@/global/api/useAdminReportQuery";
 import type { AdminReport, ReportStatus } from "@/global/types/report.types";
+import AdminGuard from "../AdminGuard";
 
 const statusColors: Record<ReportStatus, string> = {
   WAITING: "bg-yellow-100 text-yellow-800",
