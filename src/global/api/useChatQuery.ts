@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/global/backend/client";
 import { unwrap } from "@/global/backend/unwrap";
 import { useLoginStore } from "../stores/useLoginStore";
-import { ChatRoomDataResp, DirectChatRoomResp, GroupChatRoomResp, AIChatRoomResp, CreateGroupChatReq, JoinGroupChatReq } from "../types/chat.types";
+import { ChatRoomDataResp, ChatRoomPageDataResp, DirectChatRoomResp, GroupChatRoomResp, AIChatRoomResp, CreateGroupChatReq, JoinGroupChatReq } from "../types/chat.types";
 import { ChatRoomResp } from "@/global/types/chat.types";
 import { useRouter } from "next/navigation";
 
@@ -13,23 +13,54 @@ import { useRouter } from "next/navigation";
 
 const fetchChatMessages = async (
   roomId: number,
-  chatRoomType: string
-): Promise<ChatRoomDataResp> => {
+  chatRoomType: string,
+  cursor?: number,
+  size?: number
+): Promise<ChatRoomPageDataResp> => {
   if (!roomId || !chatRoomType) {
-    return { chatRoomType: "DIRECT", messages: [] };
+    return {
+      chatRoomType: "DIRECT",
+      messages: [],
+      nextCursor: null,
+      hasMore: false
+    };
+  }
+
+  const queryParams: any = {
+    chatRoomType: chatRoomType.toUpperCase() as "DIRECT" | "GROUP" | "AI"
+  };
+
+  if (cursor !== undefined) {
+    queryParams.cursor = cursor;
+  }
+
+  if (size !== undefined) {
+    queryParams.size = size;
   }
 
   const response = await apiClient.GET("/api/v1/chats/rooms/{roomId}/messages", {
     params: {
       path: { roomId },
-      query: { chatRoomType: chatRoomType.toUpperCase() as "DIRECT" | "GROUP" | "AI" },
+      query: queryParams,
     },
   });
 
-  // Correctly use unwrap to get the data payload
-  const chatData = await unwrap<ChatRoomDataResp>(response);
+  const chatData = await unwrap<ChatRoomPageDataResp>(response);
 
-  return chatData || { chatRoomType: "DIRECT", messages: [] };
+  console.log('[API] fetchChatMessages response:', {
+    cursor,
+    hasData: !!chatData,
+    messageCount: chatData?.messages?.length,
+    nextCursor: chatData?.nextCursor,
+    hasMore: chatData?.hasMore
+  });
+
+  return chatData || {
+    chatRoomType: "DIRECT",
+    messages: [],
+    nextCursor: null,
+    hasMore: false
+  };
 };
 
 const fetchDirectChatRooms = async (): Promise<DirectChatRoomResp[]> => {
@@ -60,17 +91,27 @@ const fetchPublicGroupChatRooms = async (): Promise<GroupChatRoomResp[]> => {
 
 export const useChatMessagesQuery = (
   roomId: number,
-  chatRoomType: string
+  chatRoomType: string,
+  pageSize: number = 25
 ) => {
   const { accessToken } = useLoginStore();
 
-  return useQuery<ChatRoomDataResp, Error>({
+  return useInfiniteQuery<ChatRoomPageDataResp, Error>({
     queryKey: ["chatMessages", roomId, chatRoomType],
-    queryFn: () => fetchChatMessages(roomId, chatRoomType),
+    queryFn: ({ pageParam }) =>
+      fetchChatMessages(roomId, chatRoomType, pageParam as number | undefined, pageSize),
     enabled: !!accessToken && !!roomId && !!chatRoomType,
-    staleTime: 0, // Always fetch fresh data when entering a chat room
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => {
+      // Return the nextCursor if there are more messages, otherwise undefined
+      if (!lastPage) {
+        return undefined;
+      }
+      return lastPage.hasMore ? lastPage.nextCursor : undefined;
+    },
+    staleTime: 0,
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnMount: true,
   });
 };
 
@@ -265,6 +306,112 @@ export const useLeaveChatRoom = () => {
     onError: (error) => {
       console.error("Failed to leave chat room:", error);
       alert(`채팅방을 나가는 데 실패했습니다: ${error.message}`);
+    },
+  });
+};
+
+// --- File Upload Mutation ---
+
+interface UploadFileVariables {
+  roomId: number;
+  chatRoomType: string;
+  file: File;
+  messageType: 'IMAGE' | 'FILE';
+}
+
+const uploadFile = async (variables: UploadFileVariables): Promise<MessageResp> => {
+  const formData = new FormData();
+  formData.append('file', variables.file);
+  formData.append('chatRoomType', variables.chatRoomType.toUpperCase());
+  formData.append('messageType', variables.messageType);
+
+  const response = await apiClient.POST("/api/v1/chats/rooms/{roomId}/files", {
+    params: {
+      path: { roomId: variables.roomId },
+    },
+    body: formData,
+  });
+
+  const unwrappedResponse = await unwrap<MessageResp>(response);
+  if (!unwrappedResponse) {
+    throw new Error("Failed to upload file: No data received.");
+  }
+  return unwrappedResponse;
+};
+
+export const useUploadFileMutation = () => {
+  return useMutation<MessageResp, Error, UploadFileVariables>({
+    mutationFn: uploadFile,
+    onSuccess: (data) => {
+      console.log('File uploaded successfully, message sent via WebSocket:', data);
+    },
+    onError: (error) => {
+      console.error("Failed to upload file:", error);
+      alert(`파일 업로드에 실패했습니다: ${error.message}`);
+    },
+  });
+};
+
+// --- Member Management Mutations ---
+
+interface KickMemberVariables {
+  roomId: number;
+  memberId: number;
+}
+
+const kickMember = async ({ roomId, memberId }: KickMemberVariables): Promise<void> => {
+  const response = await apiClient.DELETE("/api/v1/chats/rooms/{roomId}/members/{memberId}", {
+    params: {
+      path: { roomId, memberId },
+    },
+  });
+  await unwrap(response);
+};
+
+export const useKickMemberMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, KickMemberVariables>({
+    mutationFn: kickMember,
+    onSuccess: (_, variables) => {
+      // Invalidate queries related to group chat rooms to refetch member lists
+      queryClient.invalidateQueries({ queryKey: ["chatRooms", "group"] });
+      // Optionally, you can also invalidate the specific room's messages if needed
+      // queryClient.invalidateQueries({ queryKey: ["chatMessages", variables.roomId] });
+      alert("멤버를 강퇴했습니다.");
+    },
+    onError: (error) => {
+      console.error("Failed to kick member:", error);
+      alert(`멤버 강퇴에 실패했습니다: ${error.message}`);
+    },
+  });
+};
+
+interface TransferOwnershipVariables {
+  roomId: number;
+  newOwnerId: number;
+}
+
+const transferOwnership = async ({ roomId, newOwnerId }: TransferOwnershipVariables): Promise<void> => {
+  const response = await apiClient.PATCH("/api/v1/chats/rooms/{roomId}/owner", {
+    params: {
+      path: { roomId },
+    },
+    body: { newOwnerId },
+  });
+  await unwrap(response);
+};
+
+export const useTransferOwnershipMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, TransferOwnershipVariables>({
+    mutationFn: transferOwnership,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chatRooms", "group"] });
+      alert("방장을 위임했습니다.");
+    },
+    onError: (error) => {
+      console.error("Failed to transfer ownership:", error);
+      alert(`방장 위임에 실패했습니다: ${error.message}`);
     },
   });
 };

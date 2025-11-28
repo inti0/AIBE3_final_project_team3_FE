@@ -1,18 +1,22 @@
 export interface ChatRoomMember {
   id: number;
   nickname: string;
+  isFriend: boolean;
 }
 
 export interface CreateGroupChatReq {
   roomName: string;
   memberIds: number[];
   password?: string; // Optional
+  description?: string;
+  topic?: string;
 }
 
 export interface DirectChatRoomResp {
   id: number;
   user1: ChatRoomMember;
   user2: ChatRoomMember;
+  unreadCount: number;
 }
 
 export interface GroupChatRoomResp {
@@ -23,7 +27,9 @@ export interface GroupChatRoomResp {
   hasPassword: boolean;
   memberCount: number;
   createdAt: string;
+  ownerId: number;
   members: ChatRoomMember[];
+  unreadCount: number;
 }
 
 export interface JoinGroupChatReq {
@@ -65,9 +71,31 @@ export interface ChatRoomDataResp {
   messages: MessageResp[];
 }
 
+export interface MessagePageResp {
+  messages: MessageResp[];
+  nextCursor: number | null;
+  hasMore: boolean;
+}
+
+export interface ChatRoomPageDataResp {
+  chatRoomType: "DIRECT" | "GROUP" | "AI";
+  messages: MessageResp[];
+  nextCursor: number | null;
+  hasMore: boolean;
+}
+
 export interface ReadStatusUpdateEvent {
   readerId: number;
   readSequence: number;
+}
+
+export interface MessageUnreadCountResp {
+  messageId: string;
+  unreadCount: number;
+}
+
+export interface UnreadCountUpdateEvent {
+  updates: MessageUnreadCountResp[];
 }
 
 export interface SubscriberCountUpdateResp {

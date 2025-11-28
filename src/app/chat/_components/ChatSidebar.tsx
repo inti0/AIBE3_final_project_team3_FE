@@ -53,6 +53,7 @@ export default function ChatSidebar({
   }) => (
     <button
       onClick={() => {
+        router.push('/chat');
         setActiveTab(tabName);
         setIsDropdownOpen(false);
       }}
@@ -116,6 +117,13 @@ export default function ChatSidebar({
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex-shrink-0 bg-gray-900 border-b border-gray-700 grid grid-cols-3">
+          <TabButton tabName="direct" label="1:1 Chat" Icon={MessageSquare} />
+          <TabButton tabName="group" label="Group Chat" Icon={Users} />
+          <TabButton tabName="ai" label="AI Chat" Icon={Bot} />
+        </div>
+
         {/* Room List */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-2">
@@ -135,9 +143,14 @@ export default function ChatSidebar({
                   }`}
                 >
                   <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-xl">
-                      {room.avatar}
-                    </div>
+                    {/* TODO: This assumes room.avatar is a full, valid URL from the backend. */}
+                    {room.avatar ? (
+                      <img src={room.avatar} alt={room.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-xl font-semibold text-white">
+                        {room.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     {room.type === "direct" && (
                       <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 border-2 border-gray-800"></span>
                     )}
@@ -156,8 +169,8 @@ export default function ChatSidebar({
                         {room.lastMessage}
                       </p>
                       {room.unreadCount && room.unreadCount > 0 ? (
-                        <span className="ml-2 mt-1 bg-emerald-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                          {room.unreadCount}
+                        <span className="ml-2 mt-1 bg-emerald-500 text-white text-xs font-bold rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center flex-shrink-0">
+                          {room.unreadCount > 99 ? '99+' : room.unreadCount}
                         </span>
                       ) : null}
                     </div>
@@ -166,13 +179,6 @@ export default function ChatSidebar({
               );
             })}
           </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex-shrink-0 bg-gray-900 border-t border-gray-700 grid grid-cols-3">
-          <TabButton tabName="direct" label="1:1 Chat" Icon={MessageSquare} />
-          <TabButton tabName="group" label="Group Chat" Icon={Users} />
-          <TabButton tabName="ai" label="AI Chat" Icon={Bot} />
         </div>
       </aside>
       <NewGroupChatModal
