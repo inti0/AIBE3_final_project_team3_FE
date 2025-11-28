@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useChatMessagesQuery, useGetDirectChatRoomsQuery, useGetGroupChatRoomsQuery, useGetAiChatRoomsQuery } from "@/global/api/useChatQuery";
 import { getStompClient, connect } from "@/global/stomp/stompClient";
 import { useLoginStore } from "@/global/stores/useLoginStore";
-import { MessageResp, DirectChatRoomResp, GroupChatRoomResp, AIChatRoomResp, ReadStatusUpdateEvent, SubscriberCountUpdateResp, UnreadCountUpdateEventDto } from "@/global/types/chat.types";
+import { MessageResp, DirectChatRoomResp, GroupChatRoomResp, AIChatRoomResp, ReadStatusUpdateEvent, SubscriberCountUpdateResp, UnreadCountUpdateEvent } from "@/global/types/chat.types";
 import type { IMessage } from "@stomp/stompjs";
 import ChatWindow from "../../_components/ChatWindow"; // Import the new component
 
@@ -129,7 +129,7 @@ export default function ChatRoomPage() {
           }
           // UnreadCount 업데이트 이벤트 처리 (서버가 정확한 값 계산해서 전송)
           else if (payload.updates !== undefined) {
-            const updateEvent = payload as UnreadCountUpdateEventDto;
+            const updateEvent = payload as UnreadCountUpdateEvent;
             console.log(`🔔 [WebSocket UNREAD UPDATE] Received ${updateEvent.updates.length} updates`);
 
             setMessages((prevMessages) => {

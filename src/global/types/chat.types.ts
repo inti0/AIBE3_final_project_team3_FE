@@ -87,13 +87,13 @@ export interface ReadStatusUpdateEvent {
   readSequence: number;
 }
 
-export interface MessageUnreadCountDto {
+export interface MessageUnreadCountResp {
   messageId: string;
   unreadCount: number;
 }
 
-export interface UnreadCountUpdateEventDto {
-  updates: MessageUnreadCountDto[];
+export interface UnreadCountUpdateEvent {
+  updates: MessageUnreadCountResp[];
 }
 
 export interface SubscriberCountUpdateResp {
