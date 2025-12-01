@@ -3,9 +3,10 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useChatMessagesQuery, useGetDirectChatRoomsQuery, useGetGroupChatRoomsQuery, useGetAiChatRoomsQuery } from "@/global/api/useChatQuery";
+import { useQueryClient } from "@tanstack/react-query";
 import { getStompClient, connect } from "@/global/stomp/stompClient";
 import { useLoginStore } from "@/global/stores/useLoginStore";
-import { MessageResp, DirectChatRoomResp, GroupChatRoomResp, AIChatRoomResp, ReadStatusUpdateEvent, SubscriberCountUpdateResp } from "@/global/types/chat.types";
+import { MessageResp, DirectChatRoomResp, GroupChatRoomResp, AIChatRoomResp, ReadStatusUpdateEvent, SubscriberCountUpdateResp, UnreadCountUpdateEvent } from "@/global/types/chat.types";
 import type { IMessage } from "@stomp/stompjs";
 import ChatWindow from "../../_components/ChatWindow"; // Import the new component
 import useRoomClosedRedirect from "@/global/hooks/useRoomClosedRedirect";
@@ -17,19 +18,37 @@ export default function ChatRoomPage() {
 
   const member = useLoginStore((state) => state.member);
   const { accessToken } = useLoginStore.getState();
+  const queryClient = useQueryClient();
 
   // Fetch room lists directly
   const { data: directRoomsData } = useGetDirectChatRoomsQuery();
   const { data: groupRoomsData } = useGetGroupChatRoomsQuery();
   const { data: aiRoomsData } = useGetAiChatRoomsQuery();
 
-  const { data, isLoading, error, dataUpdatedAt } = useChatMessagesQuery(roomId, chatRoomType);
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useChatMessagesQuery(roomId, chatRoomType);
   const [messages, setMessages] = useState<MessageResp[]>([]);
-  const [lastLoadedTimestamp, setLastLoadedTimestamp] = useState<number>(0);
   const [subscriberCount, setSubscriberCount] = useState<number>(0);
   const [totalMemberCount, setTotalMemberCount] = useState<number>(0);
 
+
   useRoomClosedRedirect();
+
+  // When message data is successfully loaded, it means markAsReadOnEnter was called on the backend.
+  // We can now invalidate the room list query to update the unread count badge.
+  useEffect(() => {
+    if (data) {
+      console.log('[Query Invalidation] Messages loaded, invalidating chatRooms query to update unread count.');
+      queryClient.invalidateQueries({ queryKey: ['chatRooms', chatRoomType] });
+    }
+  }, [data, chatRoomType, queryClient]);
+
   // Find room details from API data
   const roomDetails = useMemo(() => {
     if (!member) return null;
@@ -55,6 +74,7 @@ export default function ChatRoomPage() {
           type: chatRoomType,
           avatar: '👥',
           members: room.members,
+          ownerId: room.ownerId,
         };
       }
     } else if (chatRoomType === 'ai' && aiRoomsData) {
@@ -77,17 +97,18 @@ export default function ChatRoomPage() {
   useEffect(() => {
     console.log(`[Data] Room changed, resetting messages for roomId=${roomId}`);
     setMessages([]);
-    setLastLoadedTimestamp(0);
   }, [roomId, chatRoomType]);
 
-  // Load messages from API when data is actually updated (not from cache)
+  // Load messages from API (flatten all pages from infinite query)
   useEffect(() => {
-    if (data?.messages && dataUpdatedAt > lastLoadedTimestamp) {
-      console.log(`[Data] Loaded ${data.messages.length} messages from API (timestamp=${dataUpdatedAt}, last=${lastLoadedTimestamp})`);
-      setMessages(data.messages);
-      setLastLoadedTimestamp(dataUpdatedAt);
+    if (data?.pages) {
+      const allMessages = data.pages
+        .filter(page => page?.messages)
+        .flatMap(page => page.messages);
+      console.log(`[Data] Loaded ${allMessages.length} messages from ${data.pages.length} pages`);
+      setMessages(allMessages);
     }
-  }, [data, dataUpdatedAt, lastLoadedTimestamp]);
+  }, [data]);
 
   useEffect(() => {
     if (!roomId || !member || !chatRoomType || !accessToken) return;
@@ -101,6 +122,7 @@ export default function ChatRoomPage() {
       const client = getStompClient();
       const destination = `/topic/${chatRoomType}/rooms/${roomId}`;
       console.log(`[WebSocket] Subscribing to: ${destination}`);
+      console.log(`[WebSocket] Client connected: ${client.connected}, Session ID (internal): ${client.webSocket ? 'connected' : 'not connected'}`);
 
       // 이미 cleanup되었으면 구독하지 않음
       if (isCleanedUp) {
@@ -120,26 +142,24 @@ export default function ChatRoomPage() {
             setSubscriberCount(countEvent.subscriberCount);
             setTotalMemberCount(countEvent.totalMemberCount);
           }
-          // 읽음 이벤트 처리
-          else if (payload.readerId !== undefined && payload.readSequence !== undefined) {
-            const readEvent = payload as ReadStatusUpdateEvent;
-            console.log(`[WebSocket] Received read event:`, readEvent);
+          // UnreadCount 업데이트 이벤트 처리 (서버가 정확한 값 계산해서 전송)
+          else if (payload.updates !== undefined) {
+            const updateEvent = payload as UnreadCountUpdateEvent;
+            console.log(`🔔 [WebSocket UNREAD UPDATE] Received ${updateEvent.updates.length} updates`);
 
-            setMessages((prevMessages) =>
-              prevMessages.map((msg) => {
-                // 본인이 읽은 경우: 아무 변경 없음
-                if (readEvent.readerId === member.memberId) {
-                  return msg;
-                }
+            setMessages((prevMessages) => {
+              // Map을 만들어서 빠른 조회
+              const updateMap = new Map(updateEvent.updates.map(u => [u.messageId, u.unreadCount]));
 
-                // 다른 사람이 읽은 경우: 모든 메시지의 unreadCount를 감소 (본인이 보낸 것뿐만 아니라)
-                // 이유: 그룹채팅에서 다른 사람들의 메시지도 unreadCount를 보여줘야 함
-                if (msg.sequence <= readEvent.readSequence && msg.unreadCount > 0) {
-                  return { ...msg, unreadCount: Math.max(0, msg.unreadCount - 1) };
+              return prevMessages.map((msg) => {
+                const newCount = updateMap.get(msg.id);
+                if (newCount !== undefined) {
+                  console.log(`✅ [UNREAD UPDATE] msg ${msg.id} (seq=${msg.sequence}): ${msg.unreadCount} → ${newCount}`);
+                  return { ...msg, unreadCount: newCount };
                 }
                 return msg;
-              })
-            );
+              });
+            });
           } else {
             // 일반 메시지 처리
             const receivedMessage = payload as MessageResp;
@@ -203,6 +223,9 @@ export default function ChatRoomPage() {
       roomDetails={roomDetails ? { ...roomDetails, id: roomId, type: chatRoomType } : null}
       subscriberCount={subscriberCount}
       totalMemberCount={totalMemberCount}
+      onLoadMore={fetchNextPage}
+      hasMore={hasNextPage}
+      isLoadingMore={isFetchingNextPage}
     />
   );
 }

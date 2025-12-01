@@ -41,9 +41,10 @@ export default function ChatLayout({
       return {
         id: `direct-${room.id}`,
         name: partner.nickname,
-        avatar: partner.profileImageUrl || '/img/profile-fallback.png',
+        // TODO: Backend should provide profileImageUrl in the DirectChatRoomResp > ChatRoomMember type.
+        avatar: (partner as any).profileImageUrl,
         type: 'direct',
-        unreadCount: 0,
+        unreadCount: room.unreadCount,
         lastMessage: '대화를 시작해보세요.',
         lastMessageTime: '',
       };
@@ -55,7 +56,7 @@ export default function ChatLayout({
         name: room.name,
         avatar: '/img/group-chat-fallback.png',
         type: 'group',
-        unreadCount: 0,
+        unreadCount: room.unreadCount,
         lastMessage: room.description || '그룹 채팅방입니다.',
         lastMessageTime: '',
       };
@@ -65,7 +66,8 @@ export default function ChatLayout({
       return {
         id: `ai-${room.id}`,
         name: room.name,
-        avatar: '/img/ai-chat-fallback.png',
+        // TODO: Backend should provide a representative image URL for AI chats.
+        avatar: undefined,
         type: 'ai',
         unreadCount: 0,
         lastMessage: room.aiPersona || 'AI 튜터와 대화해보세요.',
@@ -92,27 +94,23 @@ export default function ChatLayout({
 
   const handleSetActiveTab = (tab: "direct" | "group" | "ai") => {
     setActiveTab(tab);
-    const firstRoomInTab = rooms[tab][0];
-    if (firstRoomInTab) {
-      handleSetSelectedRoom(firstRoomInTab.id);
-    } else {
-      handleSetSelectedRoom(null);
-    }
+    setSelectedRoomId(null);
+    router.push('/chat');
   };
   
   // Ensure a room is selected on initial load if there isn't one
-  useEffect(() => {
-    if (!selectedRoomId && rooms[activeTab].length > 0) {
-      const firstRoomId = rooms[activeTab][0].id;
-      const [type, actualId] = firstRoomId.split('-'); // Split here
-      setSelectedRoomId(firstRoomId);
-      router.replace(`/chat/${type}/${actualId}`); // Use split parts
-    }
-  }, [activeTab, rooms, selectedRoomId, setSelectedRoomId, router]);
+  // useEffect(() => {
+  //   if (!selectedRoomId && rooms[activeTab].length > 0) {
+  //     const firstRoomId = rooms[activeTab][0].id;
+  //     const [type, actualId] = firstRoomId.split('-'); // Split here
+  //     setSelectedRoomId(firstRoomId);
+  //     router.replace(`/chat/${type}/${actualId}`); // Use split parts
+  //   }
+  // }, [activeTab, rooms, selectedRoomId, setSelectedRoomId, router]);
 
 
   return (
-    <div className="h-screen w-full lg:w-3/5 lg:mx-auto">
+    <div className="h-[calc(100vh-4rem)] w-full lg:w-3/5 lg:mx-auto">
       <div className="flex h-full bg-gray-900 text-white rounded-xl shadow-2xl overflow-hidden">
         <ChatSidebar
           activeTab={activeTab}
