@@ -30,12 +30,12 @@ export default function ChatLayout({
     }
 
     const directRooms: ChatRoom[] = (directRoomsData || []).map((room: DirectChatRoomResp) => {
-      const partner = room.user1.id === member.id ? room.user2 : room.user1;
+      const partner = room.user1.id === member.memberId ? room.user2 : room.user1;
       console.log("Layout Debug - Direct Room Transformation:", {
         roomId: room.id,
         user1Id: room.user1.id,
         user2Id: room.user2.id,
-        currentMemberId: member.id,
+        currentMemberId: member.memberId,
         partnerNickname: partner.nickname,
       });
       return {

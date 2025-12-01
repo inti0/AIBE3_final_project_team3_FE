@@ -37,8 +37,7 @@ export default function ChatRoomPage() {
   const [subscriberCount, setSubscriberCount] = useState<number>(0);
   const [totalMemberCount, setTotalMemberCount] = useState<number>(0);
 
-
-  useRoomClosedRedirect();
+  // useRoomClosedRedirect();
 
   // When message data is successfully loaded, it means markAsReadOnEnter was called on the backend.
   // We can now invalidate the room list query to update the unread count badge.
