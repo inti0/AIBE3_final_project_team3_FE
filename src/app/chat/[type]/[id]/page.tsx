@@ -121,6 +121,7 @@ export default function ChatRoomPage() {
     const setupSubscription = () => {
       const client = getStompClient();
       const destination = `/topic/${chatRoomType}/rooms/${roomId}`;
+
       console.log(`[WebSocket] Subscribing to: ${destination}`);
       console.log(`[WebSocket] Client connected: ${client.connected}, Session ID (internal): ${client.webSocket ? 'connected' : 'not connected'}`);
 
@@ -130,45 +131,58 @@ export default function ChatRoomPage() {
         return;
       }
 
+      // 1. 통합 구독 (일반 메시지 + 번역 업데이트 + 상태 업데이트)
       subscription = client.subscribe(
         destination,
         (message: IMessage) => {
           const payload = JSON.parse(message.body);
 
-          // 구독자 수 업데이트 이벤트 처리
-          if (payload.subscriberCount !== undefined && payload.totalMemberCount !== undefined) {
+          // 1. 번역 업데이트 이벤트 처리
+          if (payload.type === 'TRANSLATION_UPDATE') {
+             console.log(`[WebSocket] Received translation update:`, payload);
+             if (payload.messageId && payload.translatedContent) {
+                setMessages((prevMessages) =>
+                  prevMessages.map((msg) =>
+                    msg.id === payload.messageId
+                      ? { ...msg, translatedContent: payload.translatedContent }
+                      : msg
+                  )
+                );
+             }
+          }
+          // 2. 구독자 수 업데이트 이벤트 처리
+          else if (payload.subscriberCount !== undefined && payload.totalMemberCount !== undefined) {
             const countEvent = payload as SubscriberCountUpdateResp;
             console.log(`[WebSocket] Received subscriber count event:`, countEvent);
             setSubscriberCount(countEvent.subscriberCount);
             setTotalMemberCount(countEvent.totalMemberCount);
           }
-          // UnreadCount 업데이트 이벤트 처리 (서버가 정확한 값 계산해서 전송)
+          // 3. UnreadCount 업데이트 이벤트 처리
           else if (payload.updates !== undefined) {
             const updateEvent = payload as UnreadCountUpdateEvent;
             console.log(`🔔 [WebSocket UNREAD UPDATE] Received ${updateEvent.updates.length} updates`);
 
             setMessages((prevMessages) => {
-              // Map을 만들어서 빠른 조회
               const updateMap = new Map(updateEvent.updates.map(u => [u.messageId, u.unreadCount]));
-
               return prevMessages.map((msg) => {
                 const newCount = updateMap.get(msg.id);
                 if (newCount !== undefined) {
-                  console.log(`✅ [UNREAD UPDATE] msg ${msg.id} (seq=${msg.sequence}): ${msg.unreadCount} → ${newCount}`);
                   return { ...msg, unreadCount: newCount };
                 }
                 return msg;
               });
             });
-          } else {
-            // 일반 메시지 처리
+          } 
+          // 4. 일반 메시지 처리
+          else {
             const receivedMessage = payload as MessageResp;
             console.log(`[WebSocket] Received message:`, receivedMessage);
             setMessages((prevMessages) => [...prevMessages, receivedMessage]);
           }
         }
       );
-      console.log(`[WebSocket] Subscription created for room ${roomId}, subscriptionId=${subscription?.id}`);
+
+      console.log(`[WebSocket] Subscription created for room ${roomId}`);
     };
 
     connect(accessToken, setupSubscription);
@@ -177,18 +191,15 @@ export default function ChatRoomPage() {
       console.log(`[WebSocket Cleanup] Starting cleanup for roomId=${roomId}, memberId=${member.id}`);
       isCleanedUp = true;
       if (subscription) {
-        console.log(`[WebSocket Cleanup] Unsubscribing from room ${roomId}, subscriptionId=${subscription.id}`);
         subscription.unsubscribe();
         subscription = null;
-        console.log(`[WebSocket Cleanup] Unsubscribed successfully from room ${roomId}`);
-      } else {
-        console.log(`[WebSocket Cleanup] No subscription to unsubscribe from room ${roomId}`);
       }
+      console.log(`[WebSocket Cleanup] Unsubscribed successfully from room ${roomId}`);
     };
   }, [roomId, member, chatRoomType, accessToken]);
 
-  const handleSendMessage = (text: string) => {
-    if (text.trim() === "" || !member) {
+  const handleSendMessage = (message: { text: string; isTranslateEnabled: boolean }) => {
+    if (message.text.trim() === "" || !member) {
       return;
     }
 
@@ -197,9 +208,10 @@ export default function ChatRoomPage() {
     if (client.connected) {
       const messagePayload = {
         roomId: roomId,
-        content: text,
+        content: message.text,
         messageType: "TEXT",
         chatRoomType: chatRoomType.toUpperCase(),
+        isTranslateEnabled: message.isTranslateEnabled,
       };
       console.log(`[WebSocket] Sending message:`, messagePayload);
       client.publish({

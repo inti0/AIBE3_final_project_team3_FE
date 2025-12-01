@@ -1,18 +1,18 @@
 "use client";
 
-import { useLeaveChatRoom, useUploadFileMutation } from "@/global/api/useChatQuery";
-import { MemberSummaryResp } from "@/global/types/auth.types";
+import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { MessageResp } from "@/global/types/chat.types";
-import type { LucideIcon } from "lucide-react";
-import { File, Image, Loader2, LogOut, MoreVertical, Paperclip, Phone, ShieldAlert, Users, Video } from "lucide-react";
-import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
-import MembersModal from "./MembersModal"; // Import the new modal component
+import { Loader2, MoreVertical, Phone, Video, ShieldAlert, LogOut, Users, LucideIcon } from "lucide-react"; // LucideIcon 추가
+import { MemberSummaryResp } from "@/global/types/auth.types";
+import { useLeaveChatRoom, useUploadFileMutation } from "@/global/api/useChatQuery";
+import MembersModal from "./MembersModal";
+import MessageInput from "./MessageInput";
 
 // Define props for the component
 interface ChatWindowProps {
   messages: MessageResp[];
   member: MemberSummaryResp | null;
-  onSendMessage: (text: string) => void;
+  onSendMessage: (message: { text: string; isTranslateEnabled: boolean }) => void;
   isLoading: boolean;
   error: Error | null;
   roomDetails: {
@@ -20,8 +20,8 @@ interface ChatWindowProps {
     name: string;
     type: string;
     avatar?: string;
-    members?: any[]; // Simplified for now
     ownerId?: number;
+    members?: any[];
   } | null;
   subscriberCount?: number;
   totalMemberCount?: number;
@@ -30,7 +30,7 @@ interface ChatWindowProps {
   isLoadingMore?: boolean;
 }
 
-type MenuActionItem = {
+type MenuActionItem = { // MenuActionItem 타입 정의도 추가 (만약 누락되었다면)
   label: string;
   icon: LucideIcon;
   action: () => void;
@@ -59,10 +59,23 @@ export default function ChatWindow({
   // State for dropdown and modals
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+  
+  // State to track which messages should show original text instead of translation
+  const [showOriginalIds, setShowOriginalIds] = useState<Set<number>>(new Set());
 
   const menuRef = useRef<HTMLDivElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const toggleOriginal = (messageId: number) => {
+    setShowOriginalIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId);
+      } else {
+        newSet.add(messageId);
+      }
+      return newSet;
+    });
+  };
 
   const { mutate: leaveRoom, isPending: isLeaving } = useLeaveChatRoom();
   const { mutate: uploadFile, isPending: isUploadingFile } = useUploadFileMutation();
@@ -80,21 +93,18 @@ export default function ChatWindow({
     };
   }, []);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'image' | 'file') => {
-    const file = event.target.files?.[0];
+  const handleFileSelect = (file: File) => {
     if (file && roomDetails) {
+      const messageType = file.type.startsWith("image/") ? "IMAGE" : "FILE";
       uploadFile({
         roomId: roomDetails.id,
         chatRoomType: roomDetails.type,
         file: file,
-        messageType: fileType === 'image' ? 'IMAGE' : 'FILE',
+        messageType: messageType,
       });
-      // Reset the input value to allow selecting the same file again
-      event.target.value = '';
     }
-    setIsMenuOpen(false);
   };
-
+  
   const handleBlockUser = () => {
     // TODO: Implement block user logic
     alert("사용자를 차단합니다. (구현 필요)");
@@ -169,17 +179,6 @@ export default function ChatWindow({
     }
   };
 
-  const handleFormSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const input = form.elements.namedItem("messageInput") as HTMLInputElement;
-    const text = input.value;
-    if (text.trim()) {
-      shouldScrollRef.current = true; // Always scroll when we send a message
-      onSendMessage(text);
-      form.reset();
-    }
-  };
 
   if (!roomDetails) {
     return (
@@ -198,31 +197,19 @@ export default function ChatWindow({
   }
 
   // --- Dynamic Menu Items ---
-  const baseMenuItems: MenuActionItem[] = [
-    { label: "사진/동영상", icon: Image, action: () => imageInputRef.current?.click() },
-    { label: "파일", icon: File, action: () => fileInputRef.current?.click() },
-  ];
-
-  const groupMenuItems: MenuActionItem[] = [
-    ...baseMenuItems,
+  const groupMenuItems = [
     { label: "멤버 보기", icon: Users, action: () => { setIsMenuOpen(false); setIsMembersModalOpen(true); } },
     { label: "채팅방 나가기", icon: LogOut, action: handleLeaveRoom, danger: true, disabled: isLeaving },
   ];
 
-  const directMenuItems: MenuActionItem[] = [
-    ...baseMenuItems,
+  const directMenuItems = [
     { label: "차단하기", icon: ShieldAlert, action: handleBlockUser, danger: true },
     { label: "신고하기", icon: ShieldAlert, action: handleReportUser, danger: true },
     { label: "채팅방 나가기", icon: LogOut, action: handleLeaveRoom, danger: true, disabled: isLeaving },
   ];
 
-  const menuItems: MenuActionItem[] = roomDetails.type === 'group' ? groupMenuItems : directMenuItems;
-  const isOwner = member?.id === roomDetails?.ownerId;
-  // For AI chats, we might want a different menu or none at all
-  if (roomDetails.type === 'ai') {
-    // Example: AI chats only have a leave option
-    // menuItems = [{ label: "채팅방 나가기", icon: LogOut, action: handleLeaveRoom, danger: true, disabled: isLeaving }];
-  }
+  const menuItems = roomDetails.type === 'group' ? groupMenuItems : directMenuItems;
+  const isOwner = member?.memberId === roomDetails?.ownerId;
   // --- End Dynamic Menu Items ---
 
   return (
@@ -251,7 +238,7 @@ export default function ChatWindow({
         <div className="flex items-center space-x-4">
           <button className="text-gray-400 hover:text-white"><Video size={20} /></button>
           <button className="text-gray-400 hover:text-white"><Phone size={20} /></button>
-
+          
           {/* Dropdown Menu */}
           <div className="relative" ref={menuRef}>
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-400 hover:text-white">
@@ -261,19 +248,20 @@ export default function ChatWindow({
               <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-md shadow-lg z-20 border border-gray-700">
                 <ul className="py-1">
                   {menuItems.map((item, index) => (
-                    <li key={index}>
-                      <button
-                        onClick={item.action}
-                        disabled={item.disabled}
-                        className={`w-full text-left flex items-center px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed ${item.danger
-                          ? "text-red-400 hover:bg-red-500 hover:text-white"
-                          : "text-gray-300 hover:bg-gray-700"
-                          }`}
-                      >
-                        <item.icon size={16} className="mr-3" />
-                        {item.label}
-                      </button>
-                    </li>
+                     <li key={index}>
+                       <button
+                         onClick={item.action}
+                         disabled={item.disabled}
+                         className={`w-full text-left flex items-center px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                           item.danger
+                             ? "text-red-400 hover:bg-red-500 hover:text-white"
+                             : "text-gray-300 hover:bg-gray-700"
+                         }`}
+                       >
+                         <item.icon size={16} className="mr-3" />
+                         {item.label}
+                       </button>
+                     </li>
                   ))}
                 </ul>
               </div>
@@ -300,102 +288,87 @@ export default function ChatWindow({
             {!hasMore && messages.length > 0 && (
               <div className="text-center text-xs text-gray-500 py-2">대화의 시작입니다.</div>
             )}
-            {messages.map((msg) => {
-              if (msg.messageType === 'SYSTEM') {
-                return (
-                  <div key={msg.id} className="text-center my-2">
-                    <p className="text-xs text-gray-500 italic px-4 py-1 bg-gray-800 rounded-full inline-block">
-                      {msg.content}
-                    </p>
+                        {messages.map((msg) => {
+                          if (msg.messageType === 'SYSTEM') {
+                            return (
+                              <div key={msg.id} className="text-center my-2">
+                                <p className="text-xs text-gray-500 italic px-4 py-1 bg-gray-800 rounded-full inline-block">
+                                  {msg.content}
+                                </p>
+                              </div>
+                            );
+                          }
+                        
+                          const isUser = msg.senderId === member?.memberId;
+                          const hasTranslation = !!msg.translatedContent;
+                          // If it has translation, show translation by default. If user toggled, show original.
+                          // If no translation, always show original (msg.content).
+                          const isShowingOriginal = !hasTranslation || showOriginalIds.has(msg.id);
+                          const displayContent = isShowingOriginal ? msg.content : msg.translatedContent;
+            
+                          return (
+                            <div key={msg.id} className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
+                              {!isUser && (
+                                <div className="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0" />
+                              )}
+                              <div className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+                                <div 
+                                  className={`max-w-md p-3 rounded-lg relative group ${
+                                    isUser ? "bg-emerald-600 text-white" : "bg-gray-700 text-gray-200"
+                                  } ${hasTranslation ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
+                                  onClick={() => hasTranslation && toggleOriginal(msg.id)}
+                                  title={hasTranslation ? "클릭하여 원문/번역 전환" : ""}
+                                >
+                                  {!isUser && <p className="text-xs font-semibold pb-1">{msg.sender}</p>}
+                                  <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
+                                  
+                                  {hasTranslation && (
+                                    <div className="flex justify-end mt-1">
+                                      <span className="text-[10px] opacity-60 border border-white/20 rounded px-1">
+                                        {isShowingOriginal ? "Original" : "Translated"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col items-center space-y-1">
+                                  {msg.unreadCount > 0 && (
+                                    <p className="text-xs text-yellow-400 font-semibold">
+                                      {msg.unreadCount}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-gray-500">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                    <div ref={messagesEndRef} />
                   </div>
-                );
-              }
-
-              const isUser = msg.senderId === member?.id;
-              return (
-                <div key={msg.id} className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
-                  {!isUser && (
-                    <div className="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0" />
+            
+                  {/* Message Input */}
+                  <MessageInput
+                    onSendMessage={(message) => {
+                      shouldScrollRef.current = true; // Always scroll when we send a message
+                      onSendMessage(message);
+                    }}
+                    onFileSelect={handleFileSelect}
+                    isUploading={isUploadingFile}
+                  />
+            
+                  {/* Member List Modal */}
+                  {roomDetails && roomDetails.type === 'group' && (
+                    <MembersModal
+                      isOpen={isMembersModalOpen}
+                      onClose={() => setIsMembersModalOpen(false)}
+                      roomId={roomDetails.id}
+                      members={roomDetails.members || []}
+                      ownerId={roomDetails.ownerId || 0}
+                      currentUserId={member?.memberId || 0}
+                      isOwner={isOwner}
+                    />
                   )}
-                  <div className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-                    <div className={`max-w-md p-3 rounded-lg ${isUser ? "bg-emerald-600 text-white" : "bg-gray-700 text-gray-200"}`}>
-                      {!isUser && <p className="text-xs font-semibold pb-1">{msg.sender}</p>}
-                      <p className="text-sm">{msg.content}</p>
-                    </div>
-                    <div className="flex flex-col items-center space-y-1">
-                      {msg.unreadCount > 0 && (
-                        <p className="text-xs text-yellow-400 font-semibold">
-                          {msg.unreadCount}
-                        </p>
-                      )}
-                      <p className="text-xs text-gray-500">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                    </div>
-                  </div>
-                </div>
+                </main>
               );
-            })}
-          </>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Message Input */}
-      <div className="p-4 bg-gray-800 border-t border-gray-700">
-        <form onSubmit={handleFormSubmit} className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Attach file"
-            disabled={isUploadingFile}
-          >
-            {isUploadingFile ? <Loader2 size={20} className="animate-spin" /> : <Paperclip size={20} />}
-          </button>
-          <input
-            name="messageInput"
-            type="text"
-            placeholder="Type a message..."
-            autoComplete="off"
-            className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            disabled={isUploadingFile}
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isUploadingFile}
-          >
-            Send
-          </button>
-        </form>
-      </div>
-
-      {/* Hidden File Inputs */}
-      <input
-        type="file"
-        ref={imageInputRef}
-        onChange={(e) => handleFileSelect(e, 'image')}
-        className="hidden"
-        accept="image/*"
-      />
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={(e) => handleFileSelect(e, 'file')}
-        className="hidden"
-      />
-
-      {/* Member List Modal */}
-      {roomDetails && roomDetails.type === 'group' && (
-        <MembersModal
-          isOpen={isMembersModalOpen}
-          onClose={() => setIsMembersModalOpen(false)}
-          roomId={roomDetails.id}
-          members={roomDetails.members || []}
-          ownerId={roomDetails.ownerId || 0}
-          currentUserId={member?.id || 0}
-          isOwner={isOwner}
-        />
-      )}
-    </main>
-  );
-}
+            }
