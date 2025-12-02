@@ -158,6 +158,13 @@ export default function ChatRoomPage() {
           }
           // 3. UnreadCount 업데이트 이벤트 처리
           else if (payload.updates !== undefined) {
+            const countEvent = payload as SubscriberCountUpdateResp;
+            console.log(`[WebSocket] Received subscriber count event:`, countEvent);
+            setSubscriberCount(countEvent.subscriberCount);
+            setTotalMemberCount(countEvent.totalMemberCount);
+          }
+          // 3. UnreadCount 업데이트 이벤트 처리
+          else if (payload.updates !== undefined) {
             const updateEvent = payload as UnreadCountUpdateEvent;
             console.log(`🔔 [WebSocket UNREAD UPDATE] Received ${updateEvent.updates.length} updates`);
 

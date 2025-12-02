@@ -5,6 +5,7 @@ import { MessageResp } from "@/global/types/chat.types";
 import { Loader2, MoreVertical, Phone, Video, ShieldAlert, LogOut, Users, LucideIcon } from "lucide-react"; // LucideIcon 추가
 import { MemberSummaryResp } from "@/global/types/auth.types";
 import { useLeaveChatRoom, useUploadFileMutation } from "@/global/api/useChatQuery";
+import { useLanguage } from "@/contexts/LanguageContext";
 import MembersModal from "./MembersModal";
 import MessageInput from "./MessageInput";
 
@@ -51,6 +52,7 @@ export default function ChatWindow({
   hasMore = false,
   isLoadingMore = false,
 }: ChatWindowProps) {
+  const { t } = useLanguage();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
@@ -290,10 +292,22 @@ export default function ChatWindow({
             )}
                         {messages.map((msg) => {
                           if (msg.messageType === 'SYSTEM') {
+                            let systemMessage = msg.content;
+                            try {
+                              const parsed = JSON.parse(msg.content);
+                              if (parsed.type && parsed.params) {
+                                systemMessage = t(`system.${parsed.type}`, parsed.params);
+                              } else if (parsed.fallback) {
+                                systemMessage = parsed.fallback;
+                              }
+                            } catch (e) {
+                              // Fallback to original content if not JSON
+                            }
+
                             return (
                               <div key={msg.id} className="text-center my-2">
                                 <p className="text-xs text-gray-500 italic px-4 py-1 bg-gray-800 rounded-full inline-block">
-                                  {msg.content}
+                                  {systemMessage}
                                 </p>
                               </div>
                             );
