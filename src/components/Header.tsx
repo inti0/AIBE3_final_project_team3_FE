@@ -13,11 +13,8 @@ import {
   useMarkNotificationRead,
   useNotificationsQuery,
 } from "@/global/api/useNotificationQuery";
-<<<<<<< HEAD
 import { useLanguage } from "@/contexts/LanguageContext";
-=======
 import apiClient from "@/global/backend/client";
->>>>>>> da2748fd84c624e994fb785aebc9bb97782581bd
 import { useLoginStore } from "@/global/stores/useLoginStore";
 import { useNotificationStore } from "@/global/stores/useNotificationStore";
 import { NotificationItem } from "@/global/types/notification.types";
