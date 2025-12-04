@@ -2,13 +2,13 @@
 
 import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { MessageResp } from "@/global/types/chat.types";
-import { Loader2, MoreVertical, Phone, Video, ShieldAlert, LogOut, Users, LucideIcon, Sparkles } from "lucide-react"; // Sparkles 추가
+import { Loader2, MoreVertical, Phone, Video, ShieldAlert, LogOut, Users, LucideIcon, Sparkles } from "lucide-react";
 import { MemberSummaryResp } from "@/global/types/auth.types";
-import { useLeaveChatRoom, useUploadFileMutation, useAiFeedbackMutation } from "@/global/api/useChatQuery"; // useAiFeedbackMutation 추가
+import { useLeaveChatRoom, useUploadFileMutation, useAiFeedbackMutation } from "@/global/api/useChatQuery";
 import { useLanguage } from "@/contexts/LanguageContext";
 import MembersModal from "./MembersModal";
 import MessageInput from "./MessageInput";
-import LearningNoteModal from "./LearningNoteModal"; // Import Modal
+import LearningNoteModal from "./LearningNoteModal";
 import { AiFeedbackResp } from "@/global/types/chat.types";
 
 // Define props for the component
@@ -70,11 +70,11 @@ export default function ChatWindow({
   const [analysisResult, setAnalysisResult] = useState<AiFeedbackResp | null>(null);
   
   // State to track which messages should show original text instead of translation
-  const [showOriginalIds, setShowOriginalIds] = useState<Set<number>>(new Set());
+  const [showOriginalIds, setShowOriginalIds] = useState<Set<string>>(new Set());
 
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const toggleOriginal = (messageId: number) => {
+  const toggleOriginal = (messageId: string) => {
     setShowOriginalIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(messageId)) {
@@ -88,7 +88,7 @@ export default function ChatWindow({
 
   const { mutate: leaveRoom, isPending: isLeaving } = useLeaveChatRoom();
   const { mutate: uploadFile, isPending: isUploadingFile } = useUploadFileMutation();
-  const { mutate: analyzeFeedback, isPending: isAnalyzing } = useAiFeedbackMutation(); // Mutation Hook
+  const { mutate: analyzeFeedback, isPending: isAnalyzing } = useAiFeedbackMutation();
 
   const handleAnalyzeClick = (original: string, translated: string) => {
     setSelectedMessageForAnalysis({ original, translated });
@@ -127,7 +127,7 @@ export default function ChatWindow({
       });
     }
   };
-  
+
   const handleBlockUser = () => {
     // TODO: Implement block user logic
     alert("사용자를 차단합니다. (구현 필요)");
@@ -240,7 +240,7 @@ export default function ChatWindow({
   ];
 
   const menuItems = roomDetails.type === 'group' ? groupMenuItems : directMenuItems;
-  const isOwner = member?.memberId === roomDetails?.ownerId;
+  const isOwner = member?.id === roomDetails?.ownerId;
   // --- End Dynamic Menu Items ---
 
   return (
@@ -269,7 +269,7 @@ export default function ChatWindow({
         <div className="flex items-center space-x-4">
           <button className="text-gray-400 hover:text-white"><Video size={20} /></button>
           <button className="text-gray-400 hover:text-white"><Phone size={20} /></button>
-          
+
           {/* Dropdown Menu */}
           <div className="relative" ref={menuRef}>
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-400 hover:text-white">
@@ -279,20 +279,19 @@ export default function ChatWindow({
               <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-md shadow-lg z-20 border border-gray-700">
                 <ul className="py-1">
                   {menuItems.map((item, index) => (
-                     <li key={index}>
-                       <button
-                         onClick={item.action}
-                         disabled={item.disabled}
-                         className={`w-full text-left flex items-center px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-                           item.danger
-                             ? "text-red-400 hover:bg-red-500 hover:text-white"
-                             : "text-gray-300 hover:bg-gray-700"
-                         }`}
-                       >
-                         <item.icon size={16} className="mr-3" />
-                         {item.label}
-                       </button>
-                     </li>
+                    <li key={index}>
+                      <button
+                        onClick={item.action}
+                        disabled={item.disabled}
+                        className={`w-full text-left flex items-center px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed ${item.danger
+                            ? "text-red-400 hover:bg-red-500 hover:text-white"
+                            : "text-gray-300 hover:bg-gray-700"
+                          }`}
+                      >
+                        <item.icon size={16} className="mr-3" />
+                        {item.label}
+                      </button>
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -342,7 +341,7 @@ export default function ChatWindow({
                             );
                           }
                         
-                          const isUser = msg.senderId === member?.memberId;
+                          const isUser = msg.senderId === member?.id;
                           const hasTranslation = !!msg.translatedContent;
                           // If it has translation, show translation by default. If user toggled, show original.
                           // If no translation, always show original (msg.content).
@@ -436,40 +435,40 @@ export default function ChatWindow({
                     )}
                     <div ref={messagesEndRef} />
                   </div>
-            
-                  {/* Message Input */}
-                  <MessageInput
-                    onSendMessage={(message) => {
-                      shouldScrollRef.current = true; // Always scroll when we send a message
-                      onSendMessage(message);
-                    }}
-                    onFileSelect={handleFileSelect}
-                    isUploading={isUploadingFile}
-                  />
-            
-                  {/* Member List Modal */}
-                  {roomDetails && roomDetails.type === 'group' && (
-                    <MembersModal
-                      isOpen={isMembersModalOpen}
-                      onClose={() => setIsMembersModalOpen(false)}
-                      roomId={roomDetails.id}
-                      members={roomDetails.members || []}
-                      ownerId={roomDetails.ownerId || 0}
-                      currentUserId={member?.memberId || 0}
-                      isOwner={isOwner}
-                    />
-                  )}
 
-                  {/* Learning Note Modal */}
-                  {selectedMessageForAnalysis && (
-                    <LearningNoteModal
-                      isOpen={isLearningNoteModalOpen}
-                      onClose={() => setIsLearningNoteModalOpen(false)}
-                      originalContent={selectedMessageForAnalysis.original}
-                      translatedContent={selectedMessageForAnalysis.translated}
-                      feedbackData={analysisResult}
-                    />
-                  )}
-                </main>
-              );
-            }
+      {/* Message Input */}
+      <MessageInput
+        onSendMessage={(message) => {
+          shouldScrollRef.current = true; // Always scroll when we send a message
+          onSendMessage(message);
+        }}
+        onFileSelect={handleFileSelect}
+        isUploading={isUploadingFile}
+      />
+
+      {/* Member List Modal */}
+      {roomDetails && roomDetails.type === 'group' && (
+        <MembersModal
+          isOpen={isMembersModalOpen}
+          onClose={() => setIsMembersModalOpen(false)}
+          roomId={roomDetails.id}
+          members={roomDetails.members || []}
+          ownerId={roomDetails.ownerId || 0}
+          currentUserId={member?.id ?? 0}
+          isOwner={isOwner}
+        />
+      )}
+
+      {/* Learning Note Modal */}
+      {selectedMessageForAnalysis && (
+        <LearningNoteModal
+          isOpen={isLearningNoteModalOpen}
+          onClose={() => setIsLearningNoteModalOpen(false)}
+          originalContent={selectedMessageForAnalysis.original}
+          translatedContent={selectedMessageForAnalysis.translated}
+          feedbackData={analysisResult}
+        />
+      )}
+    </main>
+  );
+}
