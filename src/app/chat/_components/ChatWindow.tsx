@@ -357,14 +357,14 @@ export default function ChatWindow({
                           const displayContent = isShowingOriginal ? msg.content : msg.translatedContent;
             
                           return (
-                            <div key={msg.id} className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
+                            <div key={msg.id} className={`flex items-start gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
                               {!isUser && (() => {
                                 const senderMember = roomDetails?.members?.find((m: ChatRoomMember) => m.id === msg.senderId);
                                 const hasProfileImage = senderMember?.profileImageUrl && senderMember.profileImageUrl.trim() !== '';
                                 return (
                                   <button
                                     onClick={() => senderMember && setSelectedMemberForProfile(senderMember)}
-                                    className="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm hover:ring-2 hover:ring-gray-400 transition-all overflow-hidden cursor-pointer"
+                                    className="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm hover:ring-2 hover:ring-gray-400 transition-all overflow-hidden cursor-pointer mt-5"
                                     title={`${msg.sender}님의 프로필 보기`}
                                   >
                                     {hasProfileImage ? (
@@ -383,15 +383,18 @@ export default function ChatWindow({
                                   </button>
                                 );
                               })()}
-                              <div className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-                                <div 
-                                  className={`max-w-md p-3 rounded-lg relative group ${
-                                    isUser ? "bg-emerald-600 text-white" : "bg-gray-700 text-gray-200"
-                                  } ${hasTranslation ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
-                                  onClick={() => hasTranslation && toggleOriginal(msg.id)}
-                                  title={hasTranslation ? "클릭하여 원문/번역 전환" : ""}
-                                >
-                                  {!isUser && <p className="text-xs font-semibold pb-1">{msg.sender}</p>}
+                              <div className="flex flex-col gap-1 max-w-md">
+                                {!isUser && (
+                                  <p className="text-xs font-semibold text-gray-400 px-1">{msg.sender}</p>
+                                )}
+                                <div className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+                                  <div
+                                    className={`p-3 rounded-lg relative group ${
+                                      isUser ? "bg-emerald-600 text-white" : "bg-gray-700 text-gray-200"
+                                    } ${hasTranslation ? "cursor-pointer hover:opacity-90 transition-opacity" : ""}`}
+                                    onClick={() => hasTranslation && toggleOriginal(msg.id)}
+                                    title={hasTranslation ? "클릭하여 원문/번역 전환" : ""}
+                                  >
                                   
                                   {msg.messageType === 'IMAGE' ? (
                                     <img 
@@ -457,6 +460,7 @@ export default function ChatWindow({
                                   )}
                                   <p className="text-xs text-gray-500">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                 </div>
+                              </div>
                               </div>
                             </div>
                           );
