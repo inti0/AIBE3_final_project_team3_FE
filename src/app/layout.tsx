@@ -2,6 +2,7 @@
 
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import Toast from "@/components/Toast";
 import ReactQueryProvider from "@/global/components/ReactQueryProvider";
 import StompProvider from "@/global/stomp/StompProvider";
 import { LanguageProvider } from "@/contexts/LanguageContext";
@@ -32,6 +33,7 @@ export default function RootLayout({
                   {children}
                 </main>
                 <Footer />
+                <Toast />
               </div>
             </StompProvider>
           </ReactQueryProvider>

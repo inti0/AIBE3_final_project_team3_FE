@@ -1,8 +1,8 @@
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCreateLearningNote } from "@/global/api/useLearningNotes";
 import { AiFeedbackResp } from "@/global/types/chat.types";
-import { Loader2, Save, X, CheckCircle, AlertTriangle, BookOpen } from "lucide-react";
-import { useState } from "react";
+import { Loader2, Save, X, CheckCircle, AlertTriangle, BookOpen, CheckSquare, Square } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface LearningNoteModalProps {
   isOpen: boolean;
@@ -22,15 +22,35 @@ export default function LearningNoteModal({
   const { t } = useLanguage();
   const { mutate: createNote, isPending: isSaving } = useCreateLearningNote();
   const [isSaved, setIsSaved] = useState(false);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (isOpen && feedbackData) {
+      const allIndices = new Set(feedbackData.feedback.map((_, i) => i));
+      setSelectedIndices(allIndices);
+    }
+  }, [isOpen, feedbackData]);
 
   if (!isOpen || !feedbackData) return null;
 
+  const toggleFeedback = (index: number) => {
+    const newSet = new Set(selectedIndices);
+    if (newSet.has(index)) {
+      newSet.delete(index);
+    } else {
+      newSet.add(index);
+    }
+    setSelectedIndices(newSet);
+  };
+
   const handleSave = () => {
+    const selectedFeedback = feedbackData.feedback.filter((_, index) => selectedIndices.has(index));
+
     createNote(
       {
         originalContent: originalContent,
         correctedContent: feedbackData.correctedContent,
-        feedback: feedbackData.feedback.map(item => ({
+        feedback: selectedFeedback.map(item => ({
           tag: item.tag,
           problem: item.problem,
           correction: item.correction,
@@ -92,7 +112,7 @@ export default function LearningNoteModal({
           <div>
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <AlertTriangle size={18} className="text-yellow-500" />
-              Analysis & Feedback
+              Analysis & Feedback <span className="text-sm font-normal text-gray-400 ml-2">(Select items to save)</span>
             </h3>
             
             {feedbackData.feedback.length === 0 ? (
@@ -101,53 +121,76 @@ export default function LearningNoteModal({
               </div>
             ) : (
               <div className="space-y-3">
-                {feedbackData.feedback.map((item, index) => (
-                  <div key={index} className="bg-gray-750 p-4 rounded-lg border-l-4 border-yellow-500 bg-gray-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-1 rounded text-xs font-bold bg-yellow-500/20 text-yellow-400">
-                        {item.tag}
-                      </span>
+                {feedbackData.feedback.map((item, index) => {
+                  const isSelected = selectedIndices.has(index);
+                  return (
+                    <div 
+                      key={index} 
+                      onClick={() => toggleFeedback(index)}
+                      className={`p-4 rounded-lg border transition-all cursor-pointer flex items-start gap-3 ${
+                        isSelected 
+                          ? "bg-gray-800 border-yellow-500/50" 
+                          : "bg-gray-900 border-gray-700 opacity-60 hover:opacity-80"
+                      }`}
+                    >
+                      <div className={`mt-1 flex-shrink-0 ${isSelected ? "text-yellow-500" : "text-gray-500"}`}>
+                        {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            isSelected ? "bg-yellow-500/20 text-yellow-400" : "bg-gray-700 text-gray-400"
+                          }`}>
+                            {item.tag}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm mb-2">
+                          <span className="text-red-400 line-through">{item.problem}</span>
+                          <span className="text-gray-500">→</span>
+                          <span className={`font-bold ${isSelected ? "text-green-400" : "text-green-700"}`}>{item.correction}</span>
+                        </div>
+                        <p className={`text-sm ${isSelected ? "text-gray-300" : "text-gray-500"}`}>{item.extra}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-sm mb-2">
-                      <span className="text-red-400 line-through">{item.problem}</span>
-                      <span className="text-gray-500">→</span>
-                      <span className="text-green-400 font-bold">{item.correction}</span>
-                    </div>
-                    <p className="text-gray-300 text-sm">{item.extra}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-700 bg-gray-850 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
-          >
-            Close
-          </button>
-          
-          <button
-            onClick={handleSave}
-            disabled={isSaving || isSaved}
-            className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all ${
-              isSaved
-                ? "bg-green-600 text-white cursor-default"
-                : "bg-emerald-600 hover:bg-emerald-500 text-white"
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {isSaving ? (
-              <Loader2 className="animate-spin" size={18} />
-            ) : isSaved ? (
-              <CheckCircle size={18} />
-            ) : (
-              <Save size={18} />
-            )}
-            {isSaved ? "Saved!" : "Save to Note"}
-          </button>
+        <div className="p-4 border-t border-gray-700 bg-gray-850 flex justify-between items-center gap-3">
+          <div className="text-sm text-gray-400 pl-2">
+            {selectedIndices.size} items selected
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-gray-300 hover:bg-gray-700 transition-colors"
+            >
+              Close
+            </button>
+            
+            <button
+              onClick={handleSave}
+              disabled={isSaving || isSaved}
+              className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all ${
+                isSaved
+                  ? "bg-green-600 text-white cursor-default"
+                  : "bg-emerald-600 hover:bg-emerald-500 text-white"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {isSaving ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : isSaved ? (
+                <CheckCircle size={18} />
+              ) : (
+                <Save size={18} />
+              )}
+              {isSaved ? "Saved!" : "Save to Note"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

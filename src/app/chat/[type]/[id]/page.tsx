@@ -73,6 +73,10 @@ export default function ChatRoomPage() {
           avatar: '👥',
           members: room.members,
           ownerId: room.ownerId,
+          description: room.description,
+          topic: room.topic,
+          hasPassword: room.hasPassword,
+          createdAt: room.createdAt,
         };
       }
     } else if (chatRoomType === 'ai' && aiRoomsData) {
@@ -202,6 +206,20 @@ export default function ChatRoomPage() {
             const receivedMessage = payload as MessageResp;
             console.log(`[WebSocket] Received message:`, receivedMessage);
             setMessages((prevMessages) => [...prevMessages, receivedMessage]);
+
+            // 방장 위임 시스템 메시지인 경우 채팅방 정보 업데이트
+            if (receivedMessage.messageType === 'SYSTEM' && receivedMessage.content) {
+              try {
+                const systemMsg = JSON.parse(receivedMessage.content);
+                if (systemMsg.type === 'OWNER_CHANGED') {
+                  console.log('[WebSocket] Owner changed, refetching room info');
+                  queryClient.invalidateQueries({ queryKey: ['chatRooms', chatRoomType] });
+                }
+              } catch (e) {
+                // Not a JSON system message, ignore
+              }
+            }
+            // Note: 방 리스트 업데이트는 layout.tsx의 /user/{userId}/topic/rooms/update 구독에서 처리됨
           }
         }
       );

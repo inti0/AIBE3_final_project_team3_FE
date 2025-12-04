@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useLayoutEffect, useState } from "react";
-import { MessageResp } from "@/global/types/chat.types";
+import { MessageResp, ChatRoomMember } from "@/global/types/chat.types";
 import { Loader2, MoreVertical, Phone, Video, ShieldAlert, LogOut, Users, LucideIcon, Sparkles } from "lucide-react";
 import { MemberSummaryResp } from "@/global/types/auth.types";
 import { useLeaveChatRoom, useUploadFileMutation, useAiFeedbackMutation } from "@/global/api/useChatQuery";
@@ -9,6 +9,9 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import MembersModal from "./MembersModal";
 import MessageInput from "./MessageInput";
 import LearningNoteModal from "./LearningNoteModal";
+import ReportModal from "@/components/ReportModal";
+import MemberProfileModal from "@/components/MemberProfileModal";
+import ChatRoomInfoModal from "@/components/ChatRoomInfoModal";
 import { AiFeedbackResp } from "@/global/types/chat.types";
 
 // Define props for the component
@@ -63,12 +66,15 @@ export default function ChatWindow({
   // State for dropdown and modals
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
-  
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isRoomInfoModalOpen, setIsRoomInfoModalOpen] = useState(false);
+  const [selectedMemberForProfile, setSelectedMemberForProfile] = useState<ChatRoomMember | null>(null);
+
   // State for Learning Note Modal
   const [isLearningNoteModalOpen, setIsLearningNoteModalOpen] = useState(false);
   const [selectedMessageForAnalysis, setSelectedMessageForAnalysis] = useState<{ original: string; translated: string } | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AiFeedbackResp | null>(null);
-  
+
   // State to track which messages should show original text instead of translation
   const [showOriginalIds, setShowOriginalIds] = useState<Set<string>>(new Set());
 
@@ -135,8 +141,7 @@ export default function ChatWindow({
   };
 
   const handleReportUser = () => {
-    // TODO: Implement report user logic
-    alert("사용자를 신고합니다. (구현 필요)");
+    setIsReportModalOpen(true);
     setIsMenuOpen(false);
   };
 
@@ -247,17 +252,20 @@ export default function ChatWindow({
     <main className="flex flex-col bg-gray-850 overflow-hidden h-full">
       {/* Chat Header */}
       <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
-        <div className="flex items-center min-w-0">
+        <button
+          onClick={() => setIsRoomInfoModalOpen(true)}
+          className="flex items-center min-w-0 hover:bg-gray-700/30 rounded-lg p-2 -m-2 transition-colors group"
+        >
           <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-lg">
+            <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-lg group-hover:ring-2 group-hover:ring-emerald-400 transition-all">
               {roomDetails.avatar}
             </div>
             {roomDetails.type === "direct" && (
               <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-gray-850"></span>
             )}
           </div>
-          <div className="ml-4 min-w-0">
-            <h2 className="font-semibold text-white truncate">{roomDetails.name}</h2>
+          <div className="ml-4 min-w-0 text-left">
+            <h2 className="font-semibold text-white truncate group-hover:text-emerald-400 transition-colors">{roomDetails.name}</h2>
             <p className="text-xs text-gray-400">
               {roomDetails.type === "direct"
                 ? (subscriberCount === 2 ? "온라인" : "오프라인")
@@ -265,7 +273,7 @@ export default function ChatWindow({
               }
             </p>
           </div>
-        </div>
+        </button>
         <div className="flex items-center space-x-4">
           <button className="text-gray-400 hover:text-white"><Video size={20} /></button>
           <button className="text-gray-400 hover:text-white"><Phone size={20} /></button>
@@ -350,9 +358,31 @@ export default function ChatWindow({
             
                           return (
                             <div key={msg.id} className={`flex items-end gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
-                              {!isUser && (
-                                <div className="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0" />
-                              )}
+                              {!isUser && (() => {
+                                const senderMember = roomDetails?.members?.find((m: ChatRoomMember) => m.id === msg.senderId);
+                                const hasProfileImage = senderMember?.profileImageUrl && senderMember.profileImageUrl.trim() !== '';
+                                return (
+                                  <button
+                                    onClick={() => senderMember && setSelectedMemberForProfile(senderMember)}
+                                    className="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm hover:ring-2 hover:ring-gray-400 transition-all overflow-hidden cursor-pointer"
+                                    title={`${msg.sender}님의 프로필 보기`}
+                                  >
+                                    {hasProfileImage ? (
+                                      <img
+                                        src={senderMember.profileImageUrl}
+                                        alt={msg.sender}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                          e.currentTarget.parentElement!.textContent = msg.sender.charAt(0).toUpperCase();
+                                        }}
+                                      />
+                                    ) : (
+                                      msg.sender.charAt(0).toUpperCase()
+                                    )}
+                                  </button>
+                                );
+                              })()}
                               <div className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
                                 <div 
                                   className={`max-w-md p-3 rounded-lg relative group ${
@@ -469,6 +499,41 @@ export default function ChatWindow({
           feedbackData={analysisResult}
         />
       )}
+
+      {/* Report Modal (Direct Chat Only) */}
+      {roomDetails?.type === 'direct' && member && (() => {
+        // Find the partner (the other person in the direct chat)
+        const partnerId = messages.find(msg => msg.senderId !== member.memberId)?.senderId;
+        return partnerId ? (
+          <ReportModal
+            isOpen={isReportModalOpen}
+            onClose={() => setIsReportModalOpen(false)}
+            targetMemberId={partnerId}
+            targetNickname={roomDetails.name}
+          />
+        ) : null;
+      })()}
+
+      {/* Member Profile Modal */}
+      {selectedMemberForProfile && (
+        <MemberProfileModal
+          isOpen={!!selectedMemberForProfile}
+          onClose={() => setSelectedMemberForProfile(null)}
+          member={selectedMemberForProfile}
+          isCurrentUser={member?.memberId === selectedMemberForProfile.id}
+        />
+      )}
+
+      {/* Chat Room Info Modal */}
+      <ChatRoomInfoModal
+        isOpen={isRoomInfoModalOpen}
+        onClose={() => setIsRoomInfoModalOpen(false)}
+        onOpenMembersModal={() => setIsMembersModalOpen(true)}
+        roomDetails={roomDetails}
+        currentUserId={member?.memberId}
+        subscriberCount={subscriberCount}
+        totalMemberCount={totalMemberCount}
+      />
     </main>
   );
 }
