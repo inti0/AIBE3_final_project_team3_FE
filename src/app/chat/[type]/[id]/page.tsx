@@ -106,7 +106,9 @@ export default function ChatRoomPage() {
     if (data?.pages) {
       const allMessages = data.pages
         .filter(page => page?.messages)
-        .flatMap(page => page.messages);
+        .flatMap(page => page.messages)
+        // 전체를 한번 정렬해서 순서 뒤섞임 방지 (오래된 → 최신)
+        .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
       console.log(`[Data] Loaded ${allMessages.length} messages from ${data.pages.length} pages`);
       setMessages(allMessages);
     }
@@ -205,7 +207,9 @@ export default function ChatRoomPage() {
           else {
             const receivedMessage = payload as MessageResp;
             console.log(`[WebSocket] Received message:`, receivedMessage);
-            setMessages((prevMessages) => [...prevMessages, receivedMessage]);
+            setMessages((prevMessages) =>
+              [...prevMessages, receivedMessage].sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+            );
 
             // 방장 위임 시스템 메시지인 경우 채팅방 정보 업데이트
             if (receivedMessage.messageType === 'SYSTEM' && receivedMessage.content) {
