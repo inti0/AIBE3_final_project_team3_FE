@@ -9,6 +9,8 @@ import {
   type FlattenFeedbackNote,
 } from "@/global/api/useLearningNotes";
 
+import { useLoginStore } from "@/global/stores/useLoginStore";
+
 // ========================================================
 // Tag Normalizer
 // ========================================================
@@ -39,11 +41,12 @@ function NoteCard({
   const fb = note.feedback;
   const tag = normalizeTag(fb.tag);
 
-  const tagColor = {
-    Grammar: "bg-red-100 text-red-700 border border-red-300",
-    Vocabulary: "bg-blue-100 text-blue-700 border border-blue-300",
-    Translation: "bg-purple-100 text-purple-700 border border-purple-300",
-  }[tag] ?? "bg-gray-100 text-gray-700";
+  const tagColor =
+    {
+      Grammar: "bg-red-100 text-red-700 border border-red-300",
+      Vocabulary: "bg-blue-100 text-blue-700 border border-blue-300",
+      Translation: "bg-purple-100 text-purple-700 border border-purple-300",
+    }[tag] ?? "bg-gray-100 text-gray-700";
 
   return (
     <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-4">
@@ -127,9 +130,20 @@ function NoteCard({
 
 export default function LearningNotesPage() {
   const router = useRouter();
+  // wait for Zustand store to rehydrate from storage before redirecting
+  const { accessToken, hasHydrated } = useLoginStore();
 
+  // 🔥 로그인 안 되어 있으면 로그인 화면으로 이동
+  useEffect(() => {
+    // Only redirect after the login store has been hydrated from storage.
+    if (hasHydrated && !accessToken) {
+      router.replace("/auth/login");
+    }
+  }, [accessToken, router]);
+
+  // 태그 All 추가
   const [activeTab, setActiveTab] =
-    useState<"Grammar" | "Vocabulary" | "Translation">("Grammar");
+    useState<"ALL" | "Grammar" | "Vocabulary" | "Translation">("ALL");
 
   const [filter, setFilter] =
     useState<"all" | "completed" | "incomplete">("all");
@@ -148,7 +162,8 @@ export default function LearningNotesPage() {
     setPage(0);
   }, [activeTab, filter]);
 
-  const notes: FlattenFeedbackNote[] =!isError && data?.content ? data.content : [];
+  const notes: FlattenFeedbackNote[] =
+    !isError && data?.content ? data.content : [];
 
   const totalPages = data?.totalPages ?? 0;
   const currentPage = data?.number ?? 0;
@@ -179,10 +194,10 @@ export default function LearningNotesPage() {
           </button>
         </div>
 
-        {/* 탭 */}
+        {/* 태그 탭 */}
         <div className="flex justify-between mb-6">
           <div className="flex gap-3">
-            {["Grammar", "Vocabulary", "Translation"].map((t) => (
+            {["ALL", "Grammar", "Vocabulary", "Translation"].map((t) => (
               <button
                 key={t}
                 onClick={() => setActiveTab(t as any)}
@@ -197,6 +212,7 @@ export default function LearningNotesPage() {
             ))}
           </div>
 
+          {/* 완료 필터 */}
           <div className="flex gap-3">
             {[
               { key: "all", label: "전체" },
