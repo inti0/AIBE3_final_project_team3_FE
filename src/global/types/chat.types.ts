@@ -1,7 +1,10 @@
+export type AiChatRoomType = "ROLE_PLAY" | "TUTOR_PERSONAL" | "TUTOR_SIMILAR";
+
 export interface ChatRoomMember {
   id: number;
   nickname: string;
   isFriend: boolean;
+  profileImageUrl?: string;
 }
 
 export interface CreateGroupChatReq {
@@ -17,6 +20,8 @@ export interface DirectChatRoomResp {
   user1: ChatRoomMember;
   user2: ChatRoomMember;
   unreadCount: number;
+  lastMessageAt?: string;
+  lastMessageContent?: string;
 }
 
 export interface GroupChatRoomResp {
@@ -30,6 +35,14 @@ export interface GroupChatRoomResp {
   ownerId: number;
   members: ChatRoomMember[];
   unreadCount: number;
+  lastMessageAt?: string;
+  lastMessageContent?: string;
+}
+
+export interface CreateAIChatReq {
+  roomName: string;
+  personaId: number;
+  roomType: AiChatRoomType;
 }
 
 export interface JoinGroupChatReq {
@@ -39,8 +52,15 @@ export interface JoinGroupChatReq {
 export interface AIChatRoomResp {
   id: number;
   name: string;
-  aiModelId: string;
-  aiPersona: string;
+  aiPersona: number;
+}
+
+export interface RoomLastMessageUpdateResp {
+  roomId: number;
+  chatRoomType: "DIRECT" | "GROUP" | "AI";
+  lastMessageAt: string;
+  unreadCount: number;
+  lastMessageContent: string;
 }
 
 export interface ChatRoomResp {
@@ -55,6 +75,8 @@ export type MessageResp = {
   senderId: number;
   sender: string;
   content: string;
+  translatedContent?: string;
+  isTranslateEnabled?: boolean;
   createdAt: string; // ISO 8601 형식의 문자열
   messageType: "TEXT" | "IMAGE" | "FILE" | "SYSTEM"; // 백엔드 ChatMessage.MessageType enum 값에 따라
   sequence: number;
@@ -101,4 +123,21 @@ export interface UnreadCountUpdateEvent {
 export interface SubscriberCountUpdateResp {
   subscriberCount: number;
   totalMemberCount: number;
+}
+
+export interface AiFeedbackReq {
+  originalContent: string;
+  translatedContent: string;
+}
+
+export interface AiFeedbackItem {
+  tag: string;
+  problem: string;
+  correction: string;
+  extra: string;
+}
+
+export interface AiFeedbackResp {
+  correctedContent: string;
+  feedback: AiFeedbackItem[];
 }
