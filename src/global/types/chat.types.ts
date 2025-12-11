@@ -45,6 +45,7 @@ export interface GroupChatRoomResp {
 export interface GroupChatRoomSummaryResp {
   id: number;
   name: string;
+  topic?: string;
   unreadCount: number;
   lastReadSequence?: number;
   lastMessageAt?: string;

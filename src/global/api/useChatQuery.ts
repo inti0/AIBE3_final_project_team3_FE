@@ -92,6 +92,20 @@ const fetchGroupChatRooms = async (): Promise<GroupChatRoomSummaryResp[]> => {
   return rooms || [];
 };
 
+// 단일 그룹 채팅방 상세 조회 (모달용)
+const fetchGroupChatRoomDetail = async (roomId: number): Promise<GroupChatRoomResp> => {
+  const response = await apiClient.GET("/api/v1/chats/rooms/group/{roomId}", {
+    params: {
+      path: { roomId },
+    },
+  });
+  const room = await unwrap<GroupChatRoomResp>(response);
+  if (!room) {
+    throw new Error("채팅방 정보를 불러올 수 없습니다.");
+  }
+  return room;
+};
+
 const fetchAiChatRooms = async (): Promise<AIChatRoomResp[]> => {
   const response = await apiClient.GET("/api/v1/chats/rooms/ai");
   const rooms = await unwrap<AIChatRoomResp[]>(response);
@@ -165,6 +179,17 @@ export const useGetGroupChatRoomsQuery = () => {
     queryKey: ["chatRooms", "group"],
     queryFn: fetchGroupChatRooms,
     enabled: !!accessToken,
+  });
+};
+
+// 단일 그룹 채팅방 상세 조회 (모달용)
+export const useGetGroupChatRoomDetailQuery = (roomId: number | null) => {
+  const { accessToken } = useLoginStore();
+  return useQuery<GroupChatRoomResp, Error>({
+    queryKey: ["chatRooms", "group", "detail", roomId],
+    queryFn: () => fetchGroupChatRoomDetail(roomId!),
+    enabled: !!accessToken && roomId !== null,
+    staleTime: 0, // 항상 최신 데이터 조회
   });
 };
 

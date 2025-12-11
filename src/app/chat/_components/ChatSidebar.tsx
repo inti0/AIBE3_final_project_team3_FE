@@ -3,12 +3,19 @@
 import NewGroupChatModal from '@/app/find/components/NewGroupChatModal'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { ChatRoom } from '@/global/stores/useChatStore'
-import { Bot, MessageSquare, Plus, Search, Users } from 'lucide-react'
+import {
+  Bot,
+  MessageSquare,
+  Plus,
+  Search,
+  Users,
+} from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { useChatSearchQuery } from '@/global/api/useChatQuery'
+import Avatar from "boring-avatars"
 
 type ChatSidebarProps = {
   activeTab: 'direct' | 'group' | 'ai'
@@ -239,6 +246,18 @@ export default function ChatSidebar({
                   >
                     <div className="relative">
                       {(() => {
+                        // 1. For group chats, ALWAYS use boring-avatars based on topic/name
+                        if (activeTab === 'group') {
+                          return (
+                            <Avatar
+                              size={48}
+                              name={room.topic || roomName}
+                              variant="beam"
+                              colors={["#92A1C6", "#146A7C", "#F0AB3D", "#C271B4", "#C20D90"]}
+                            />
+                          )
+                        }
+
                         const src = room.avatar?.trim() ?? ''
                         const isImageAvatar =
                           src.startsWith('http://') ||

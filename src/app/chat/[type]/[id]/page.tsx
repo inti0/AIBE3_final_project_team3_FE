@@ -64,19 +64,14 @@ export default function ChatRoomPage() {
         };
       }
     } else if (chatRoomType === 'group' && groupRoomsData) {
-      const room = groupRoomsData.find((r: GroupChatRoomResp) => r.id === roomId);
+      const room = groupRoomsData.find((r) => r.id === roomId);
       if (room) {
         return {
           id: roomId,
           name: room.name,
           type: chatRoomType,
           avatar: '👥',
-          members: room.members,
-          ownerId: room.ownerId,
-          description: room.description,
           topic: room.topic,
-          hasPassword: room.hasPassword,
-          createdAt: room.createdAt,
         };
       }
     } else if (chatRoomType === 'ai' && aiRoomsData) {
@@ -187,7 +182,7 @@ export default function ChatRoomPage() {
               return msg;
             });
           });
-        } 
+        }
         // 4. 일반 메시지 처리
         else {
           const receivedMessage = payload as MessageResp;

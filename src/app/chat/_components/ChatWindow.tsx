@@ -6,7 +6,7 @@ import ChatRoomInfoModal from "@/components/ChatRoomInfoModal";
 import MemberProfileModal from "@/components/MemberProfileModal";
 import ReportModal from "@/components/ReportModal";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useAiFeedbackMutation, useLeaveChatRoom, useUploadFileMutation } from "@/global/api/useChatQuery";
+import { useAiFeedbackMutation, useGetGroupChatRoomDetailQuery, useLeaveChatRoom, useUploadFileMutation } from "@/global/api/useChatQuery";
 import { MemberSummaryResp } from "@/global/types/auth.types";
 import { AiFeedbackResp, ChatRoomMember, MessageResp } from "@/global/types/chat.types";
 import { Loader2, LogOut, LucideIcon, MoreVertical, Phone, ShieldAlert, Sparkles, UserPlus, Users, Video } from "lucide-react";
@@ -15,6 +15,7 @@ import InviteFriendModal from "./InviteFriendModal";
 import LearningNoteModal from "./LearningNoteModal";
 import MembersModal from "./MembersModal";
 import MessageInput from "./MessageInput";
+import Avatar from "boring-avatars";
 
 const remoteImageLoader = ({ src }: ImageLoaderProps) => src;
 
@@ -32,6 +33,7 @@ interface ChatWindowProps {
     avatar?: string;
     ownerId?: number;
     members?: any[];
+    topic?: string;
   } | null;
   subscriberCount?: number;
   totalMemberCount?: number;
@@ -66,6 +68,12 @@ export default function ChatWindow({
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
   const previousScrollHeightRef = useRef<number>(0);
+
+  // 그룹 채팅방 상세 정보 조회 (멤버 목록 포함)
+  const isGroupChat = roomDetails?.type === 'group';
+  const { data: groupDetailData } = useGetGroupChatRoomDetailQuery(
+    isGroupChat && roomDetails ? roomDetails.id : null
+  );
 
   // State for dropdown and modals
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -276,7 +284,10 @@ export default function ChatWindow({
 
     return typeof member.id === "number" ? member.id : null;
   })();
-  const isOwner = typeof roomDetails?.ownerId === "number" && resolvedMemberId === roomDetails.ownerId;
+
+  // 그룹 채팅방이면 상세 데이터의 ownerId 사용
+  const effectiveOwnerId = isGroupChat && groupDetailData ? groupDetailData.ownerId : roomDetails?.ownerId;
+  const isOwner = typeof effectiveOwnerId === "number" && resolvedMemberId === effectiveOwnerId;
   const isAiRoom = roomDetails?.type === "ai";
 
   const roomStatusLabel = (() => {
@@ -307,10 +318,19 @@ export default function ChatWindow({
         >
           <div className="relative">
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-lg group-hover:ring-2 group-hover:ring-emerald-400 transition-all"
+              className="w-10 h-10 rounded-full flex items-center justify-center text-lg group-hover:ring-2 group-hover:ring-emerald-400 transition-all overflow-hidden"
               style={{ background: "var(--surface-panel-muted)" }}
             >
-              {roomDetails.avatar}
+              {roomDetails.type === 'group' ? (
+                <Avatar
+                  size={40}
+                  name={roomDetails.topic || roomDetails.name}
+                  variant="beam"
+                  colors={["#92A1C6", "#146A7C", "#F0AB3D", "#C271B4", "#C20D90"]}
+                />
+              ) : (
+                roomDetails.avatar
+              )}
             </div>
           </div>
           <div className="ml-4 min-w-0 text-left">
@@ -562,8 +582,8 @@ export default function ChatWindow({
             isOpen={isMembersModalOpen}
             onClose={() => setIsMembersModalOpen(false)}
             roomId={roomDetails.id}
-            members={roomDetails.members || []}
-            ownerId={roomDetails.ownerId || 0}
+            members={groupDetailData?.members || []}
+            ownerId={groupDetailData?.ownerId || 0}
             currentUserId={resolvedMemberId ?? 0}
             isOwner={isOwner}
           />
@@ -571,7 +591,7 @@ export default function ChatWindow({
             isOpen={isInviteModalOpen}
             onClose={() => setIsInviteModalOpen(false)}
             roomId={roomDetails.id}
-            existingMembers={roomDetails.members || []}
+            existingMembers={groupDetailData?.members || []}
           />
         </>
       )}

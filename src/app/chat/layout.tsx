@@ -150,6 +150,7 @@ export default function ChatLayout({
       return {
         id: `group-${room.id}`,
         name: room.name,
+        topic: room.topic,
         avatar: '/img/group-chat-fallback.png',
         type: 'group',
         unreadCount: room.unreadCount,
@@ -171,13 +172,15 @@ export default function ChatLayout({
       };
     });
 
-    // sort by last message time descending; rooms without timestamp go last
+    // sort by last message time descending; rooms without valid timestamp go last
+    const parseTime = (value?: string) => {
+      if (!value) return 0;
+      const t = new Date(value).getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
+
     const sortByLastMessage = (list: ChatRoom[]) =>
-      [...list].sort((a, b) => {
-        const ta = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
-        const tb = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
-        return tb - ta;
-      });
+      [...list].sort((a, b) => parseTime(b.lastMessageTime) - parseTime(a.lastMessageTime));
 
     return {
       direct: sortByLastMessage(directRooms),
