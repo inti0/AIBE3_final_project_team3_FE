@@ -1,28 +1,20 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function GameManagementLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto">
-
-        {/* 페이지 제목 */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">
-          게임 문장 관리
-        </h1>
-
-
-        {/* 하위 페이지 영역 */}
-        {children}
-      </div>
+    <div className="max-w-6xl mx-auto w-full space-y-6">
+      <h1 className="text-3xl font-bold" style={{ color: "var(--page-text)" }}>
+        {t("admin.game.layoutTitle")}
+      </h1>
+      {children}
     </div>
   );
 }
