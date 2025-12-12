@@ -19,7 +19,7 @@ interface PostDetailPageProps {
 }
 
 export default function PostDetailPage({ params }: PostDetailPageProps) {
-  const { id } = params;
+  const { id } = use(params);
   const postId = parseInt(id);
   const router = useRouter();
   const { data: post, isLoading, error } = usePostQuery(postId);
