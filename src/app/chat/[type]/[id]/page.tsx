@@ -101,11 +101,18 @@ export default function ChatRoomPage() {
     if (data?.pages) {
       const allMessages = data.pages
         .filter(page => page?.messages)
-        .flatMap(page => page.messages)
-        // 전체를 한번 정렬해서 순서 뒤섞임 방지 (오래된 → 최신)
-        .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
-      console.log(`[Data] Loaded ${allMessages.length} messages from ${data.pages.length} pages`);
-      setMessages(allMessages);
+        .flatMap(page => page.messages);
+
+      // Deduplicate by ID
+      const uniqueMessages = Array.from(
+        new Map(allMessages.map((msg) => [msg.id, msg])).values()
+      );
+
+      // 전체를 한번 정렬해서 순서 뒤섞임 방지 (오래된 → 최신)
+      uniqueMessages.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+      console.log(`[Data] Loaded ${uniqueMessages.length} messages from ${data.pages.length} pages`);
+      setMessages(uniqueMessages);
     }
   }, [data]);
 
@@ -187,9 +194,13 @@ export default function ChatRoomPage() {
         else {
           const receivedMessage = payload as MessageResp;
           console.log(`[WebSocket] Received message:`, receivedMessage);
-          setMessages((prevMessages) =>
-            [...prevMessages, receivedMessage].sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
-          );
+          setMessages((prevMessages) => {
+            // Prevent duplicate messages
+            if (prevMessages.some(m => m.id === receivedMessage.id)) {
+              return prevMessages;
+            }
+            return [...prevMessages, receivedMessage].sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+          });
 
           // 채팅방 리스트 캐시 업데이트 (실시간 정렬용)
           const roomType = chatRoomType;

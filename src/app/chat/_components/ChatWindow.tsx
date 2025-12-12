@@ -392,7 +392,9 @@ export default function ChatWindow({
             {!hasMore && messages.length > 0 && (
               <div className="text-center text-xs text-gray-500 py-2">{t('chat.ui.start_conversation')}</div>
             )}
-            {messages.map((msg) => {
+            {messages.map((msg, idx) => {
+              const messageKey = msg.id ?? `msg-${msg.sequence ?? idx}`;
+
               if (msg.messageType === 'SYSTEM') {
                 let systemMessage = msg.content;
                 try {
@@ -407,7 +409,7 @@ export default function ChatWindow({
                 }
 
                 return (
-                  <div key={msg.id} className="text-center my-2">
+                  <div key={messageKey} className="text-center my-2">
                     <p className="text-xs text-gray-500 italic px-4 py-1 inline-block rounded-full theme-surface-muted">
                       {systemMessage}
                     </p>
@@ -436,19 +438,20 @@ export default function ChatWindow({
                 };
 
               return (
-                <div key={msg.id} className={`flex items-start gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
+                <div key={messageKey} className={`flex items-start gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
                   {!isUser && (() => {
                     const senderMember = roomDetails?.members?.find((m: ChatRoomMember) => m.id === msg.senderId);
                     const hasProfileImage = Boolean(senderMember?.profileImageUrl && senderMember.profileImageUrl.trim() !== "");
                     const senderMemberId = typeof senderMember?.id === "number" ? senderMember.id : null;
                     const shouldShowFallback = !hasProfileImage || (senderMemberId != null && failedAvatarIds.has(senderMemberId));
-                    const senderInitial = msg.sender.charAt(0).toUpperCase();
+                    const senderName = typeof msg.sender === "string" && msg.sender.trim().length > 0 ? msg.sender : "Unknown";
+                    const senderInitial = senderName.charAt(0).toUpperCase();
                     return (
                       <button
                         onClick={() => senderMember && setSelectedMemberForProfile(senderMember)}
                         className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm hover:ring-2 hover:ring-gray-400 transition-all overflow-hidden cursor-pointer mt-5"
                         style={{ background: "var(--surface-panel-muted)" }}
-                        title={t('chat.ui.view_profile', { name: msg.sender })}
+                        title={t('chat.ui.view_profile', { name: senderName })}
                       >
                         {shouldShowFallback || !senderMemberId ? (
                           senderInitial
@@ -457,7 +460,7 @@ export default function ChatWindow({
                             loader={remoteImageLoader}
                             unoptimized
                             src={senderMember!.profileImageUrl}
-                            alt={msg.sender}
+                            alt={senderName}
                             width={32}
                             height={32}
                             className="w-full h-full object-cover"
@@ -469,7 +472,7 @@ export default function ChatWindow({
                   })()}
                   <div className="flex flex-col gap-1 max-w-md">
                     {!isUser && (
-                      <p className="text-xs font-semibold text-gray-400 px-1">{msg.sender}</p>
+                      <p className="text-xs font-semibold text-gray-400 px-1">{typeof msg.sender === "string" ? msg.sender : t('chat.ui.unknown_sender')}</p>
                     )}
                     <div className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
                       <div
