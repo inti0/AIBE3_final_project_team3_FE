@@ -40,7 +40,7 @@ export default function ChatLayout({
   const { accessToken, hasHydrated } = useLoginStore();
   const queryClient = useQueryClient();
   const pathname = usePathname();
-  const roomSubscriptionsRef = useRef<Map<string, any>>(new Map());
+  const userQueueSubscriptionRef = useRef<any>(null);
 
   // 인증 체크: Hydration 완료 후 토큰이 없으면 로그인 페이지로 리다이렉트
   useEffect(() => {
@@ -51,9 +51,6 @@ export default function ChatLayout({
 
   useEffect(() => {
     const parts = pathname.split('/');
-    // pathname format: /chat/[type]/[id] or /chat
-    // parts: ["", "chat", "type", "id", ...]
-
     const type = parts[2] as 'direct' | 'group' | 'ai' | undefined;
     const id = parts[3];
 
@@ -69,121 +66,84 @@ export default function ChatLayout({
   const { data: groupRoomsData } = useGetGroupChatRoomsQuery();
   const { data: aiRoomsData } = useGetAiChatRoomsQuery();
 
-  // 모든 채팅방 구독 (백그라운드 업데이트용)
+  // 개인 큐 구독 (채팅방 리스트 업데이트용)
   useEffect(() => {
     if (!member || !accessToken) return;
 
-    const allRooms = [
-      ...(directRoomsData || []).map(r => ({ id: r.id, type: 'direct' })),
-      ...(groupRoomsData || []).map(r => ({ id: r.id, type: 'group' })),
-    ];
+    function subscribeToUserQueue() {
+      const client = getStompClient();
 
-    console.log(`[Layout Background Subscription] Attempting to subscribe to ${allRooms.length} rooms`);
-
-    const client = getStompClient();
-    if (!client.connected) {
-      console.warn('[Layout Background Subscription] Client not connected yet, waiting for connection...');
-
-      // WebSocket 연결 후 구독 재시도
-      const retryTimer = setTimeout(() => {
-        const retryClient = getStompClient();
-        if (retryClient.connected) {
-          console.log('[Layout Background Subscription] Retry: Client now connected, subscribing...');
-          // useEffect를 강제로 다시 실행하기 위해 상태 변경은 없지만,
-          // 여기서 직접 구독 로직을 실행
-          setupBackgroundSubscriptions(allRooms, retryClient);
-        }
-      }, 1000);
-
-      return () => clearTimeout(retryTimer);
-    }
-
-    setupBackgroundSubscriptions(allRooms, client);
-
-    // 제거된 방 구독 해제
-    roomSubscriptionsRef.current.forEach((sub, key) => {
-      const exists = allRooms.some(r => `${r.type}-${r.id}` === key);
-      if (!exists) {
-        console.log(`[Layout Background Subscription] Unsubscribing from removed room: ${key}`);
-        sub.unsubscribe();
-        roomSubscriptionsRef.current.delete(key);
+      // 이미 구독 중이면 스킵
+      if (userQueueSubscriptionRef.current) {
+        console.log('[Layout User Queue] Already subscribed to user queue');
+        return;
       }
-    });
 
-    function setupBackgroundSubscriptions(rooms: { id: number; type: string }[], stompClient: any) {
-      rooms.forEach(({ id, type }) => {
-        const key = `${type}-${id}`;
-        if (roomSubscriptionsRef.current.has(key)) {
-          console.log(`[Layout Background Subscription] Already subscribed to ${key}`);
-          return;
-        }
+      const destination = '/user/queue/rooms.update';
+      console.log(`[Layout User Queue] Subscribing to ${destination}`);
 
-        const destination = `/topic/${type}.rooms.${id}`;
-        console.log(`[Layout Background Subscription] Subscribing to ${destination}`);
+      const subscription = client.subscribe(destination, (message: IMessage) => {
+        const payload = JSON.parse(message.body);
+        console.log(`[Layout User Queue] Received message:`, payload);
 
-        const subscription = stompClient.subscribe(destination, (message: IMessage) => {
-          const payload = JSON.parse(message.body);
+        // RoomLastMessageUpdateResp 처리
+        if (payload.chatRoomType && payload.latestSequence !== undefined) {
+          const update = payload as RoomLastMessageUpdateResp;
+          const roomType = update.chatRoomType.toLowerCase();
+          const cacheKey = ['chatRooms', roomType];
 
-          console.log(`[Layout Background Subscription] Received message on ${destination}:`, payload);
+          console.log(`[Layout User Queue Update] Processing RoomLastMessageUpdate for room ${update.roomId}, type=${roomType}, sequence=${update.latestSequence}`);
 
-          // RoomLastMessageUpdateResp 처리
-          if (payload.chatRoomType && payload.latestSequence) {
-            const update = payload as RoomLastMessageUpdateResp;
-            const roomType = update.chatRoomType.toLowerCase();
-            const cacheKey = ['chatRooms', roomType];
+          queryClient.setQueryData<any[]>(cacheKey, (prevRooms) => {
+            if (!prevRooms) {
+              console.warn(`[Layout User Queue Update] No cached rooms found for ${roomType}`);
+              return prevRooms;
+            }
 
-            console.log(`[Layout Background Update] Processing RoomLastMessageUpdate for room ${update.roomId}, type=${roomType}, sequence=${update.latestSequence}`);
+            const updated = prevRooms.map((room: any) => {
+              if (room.id !== update.roomId) return room;
 
-            queryClient.setQueryData<any[]>(cacheKey, (prevRooms) => {
-              if (!prevRooms) {
-                console.warn(`[Layout Background Update] No cached rooms found for ${roomType}`);
-                return prevRooms;
+              let unreadCount = room.unreadCount || 0;
+              if (update.senderId !== currentMemberId) {
+                const lastReadSequence = room.lastReadSequence ?? 0;
+                unreadCount = Math.max(0, update.latestSequence - lastReadSequence);
+                console.log(`[Layout User Queue Update] Room ${update.roomId} unreadCount: ${unreadCount} (latestSeq=${update.latestSequence}, lastReadSeq=${lastReadSequence})`);
+              } else {
+                unreadCount = 0;
+                console.log(`[Layout User Queue Update] Room ${update.roomId} - own message, unreadCount=0`);
               }
 
-              const updated = prevRooms.map((room: any) => {
-                if (room.id !== update.roomId) return room;
-
-                let unreadCount = room.unreadCount || 0;
-                if (update.senderId !== currentMemberId) {
-                  const lastReadSequence = room.lastReadSequence ?? 0;
-                  unreadCount = Math.max(0, update.latestSequence - lastReadSequence);
-                  console.log(`[Layout Background Update] Room ${update.roomId} unreadCount: ${unreadCount} (latestSeq=${update.latestSequence}, lastReadSeq=${lastReadSequence})`);
-                } else {
-                  unreadCount = 0;
-                  console.log(`[Layout Background Update] Room ${update.roomId} - own message, unreadCount=0`);
-                }
-
-                return {
-                  ...room,
-                  lastMessageAt: update.lastMessageAt,
-                  lastMessageContent: update.lastMessageContent,
-                  unreadCount: unreadCount
-                };
-              });
-
-              const sorted = updated.sort((a: any, b: any) => {
-                const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
-                const timeB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
-                return timeB - timeA;
-              });
-
-              console.log(`[Layout Background Update] Updated and sorted ${roomType} rooms:`, sorted.map(r => ({ id: r.id, lastMessageAt: r.lastMessageAt, unreadCount: r.unreadCount })));
-              return sorted;
+              return {
+                ...room,
+                lastMessageAt: update.lastMessageAt,
+                lastMessageContent: update.lastMessageContent,
+                unreadCount: unreadCount
+              };
             });
-          }
-        });
 
-        roomSubscriptionsRef.current.set(key, subscription);
-        console.log(`[Layout Background Subscription] Successfully subscribed to ${key}, total subscriptions: ${roomSubscriptionsRef.current.size}`);
+            const sorted = updated.sort((a: any, b: any) => {
+              const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+              const timeB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+              return timeB - timeA;
+            });
+
+            console.log(`[Layout User Queue Update] Updated and sorted ${roomType} rooms:`, sorted.map(r => ({ id: r.id, lastMessageAt: r.lastMessageAt, unreadCount: r.unreadCount })));
+            return sorted;
+          });
+        }
       });
+
+      userQueueSubscriptionRef.current = subscription;
+      console.log(`[Layout User Queue] Successfully subscribed to user queue`);
     }
 
-    // Cleanup function - 절대 구독 해제하지 않음 (다음 렌더링에서 중복 체크로 처리)
-    return () => {
-      console.log(`[Layout Background Subscription] useEffect cleanup called - keeping subscriptions alive`);
-    };
+    // STOMP 연결 후 구독 (재연결 시에도 자동 실행)
+    connect(accessToken, () => {
+      console.log('[Layout User Queue] STOMP connected, subscribing to user queue...');
+      subscribeToUserQueue();
+    });
 
-  }, [directRoomsData, groupRoomsData, member, accessToken]);
+  }, [member, accessToken, queryClient, currentMemberId]);
 
   const rooms = useMemo(() => {
     if (!member) {
@@ -195,7 +155,6 @@ export default function ChatLayout({
       return {
         id: `direct-${room.id}`,
         name: partner.nickname,
-        // TODO: Backend should provide profileImageUrl in the DirectChatRoomResp > ChatRoomMember type.
         avatar: (partner as any).profileImageUrl,
         type: 'direct',
         unreadCount: room.unreadCount,
@@ -204,7 +163,6 @@ export default function ChatLayout({
       };
     });
 
-    // [Plan C] 최적화: Summary DTO 사용
     const groupRooms: ChatRoom[] = (groupRoomsData || []).map((room: GroupChatRoomSummaryResp) => {
       return {
         id: `group-${room.id}`,
@@ -222,7 +180,6 @@ export default function ChatLayout({
       return {
         id: `ai-${room.id}`,
         name: room.name,
-        // TODO: Backend should provide a representative image URL for AI chats.
         avatar: "🤖",
         type: 'ai',
         unreadCount: 0,
@@ -231,7 +188,6 @@ export default function ChatLayout({
       };
     });
 
-    // sort by last message time descending; rooms without valid timestamp go last
     const parseTime = (value?: string) => {
       if (!value) return 0;
       const t = new Date(value).getTime();
@@ -264,7 +220,6 @@ export default function ChatLayout({
     router.push('/chat');
   };
 
-  // Hydration 중이거나 토큰이 없는 동안에는 아무것도 렌더링하지 않음
   if (!hasHydrated || !accessToken) {
     return null;
   }
