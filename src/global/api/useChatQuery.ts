@@ -65,7 +65,7 @@ const extractPaginatedPayload = <T>(payload: any): PaginatedListPage<T> => {
     dataNode?.number,
     normaliseInteger(dataNode?.page, normaliseInteger(dataNode?.pageIndex, 0))
   ) ?? 0;
-  const pageSize = normaliseInteger(dataNode?.size, items.length || 0) ?? items.length || 0;
+  const pageSize = normaliseInteger(dataNode?.size, items.length || 0) ?? (items.length || 0);
   const totalPages = normaliseInteger(dataNode?.totalPages, null);
   const totalElements = normaliseInteger(dataNode?.totalElements, null);
   const isFirst = typeof dataNode?.first === "boolean" ? dataNode.first : pageIndex <= 0;

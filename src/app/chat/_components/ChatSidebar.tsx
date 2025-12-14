@@ -254,7 +254,9 @@ export default function ChatSidebar({
                   const roomInfo = rooms.find((r) => r.id === roomIdStr) || {
                     name: hit.senderName || 'Unknown Room',
                     avatar: '',
-                  }
+                    id: `search-${activeTab}-${hit.chatRoomId}`,
+                    type: activeTab,
+                  } as ChatRoom
 
                   // 클릭 시 해당 방으로 이동
                   const href = `/chat/${activeTab}/${hit.chatRoomId}`
@@ -273,7 +275,7 @@ export default function ChatSidebar({
                             return (
                               <Avatar
                                 size={40}
-                                name={roomInfo.topic || roomInfo.name}
+                            name={roomInfo.topic || roomInfo.name}
                                 variant="beam"
                                 colors={["#92A1C6", "#146A7C", "#F0AB3D", "#C271B4", "#C20D90"]}
                               />

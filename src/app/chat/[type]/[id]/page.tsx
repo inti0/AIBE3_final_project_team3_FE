@@ -134,6 +134,19 @@ export default function ChatRoomPage() {
       destination,
       (message: IMessage) => {
         const payload = JSON.parse(message.body);
+
+        // 0. 읽음 카운트 업데이트 (배열 형태로 옴)
+        if (Array.isArray(payload)) {
+           console.log(`[WebSocket] Received unread count updates:`, payload);
+           setMessages((prevMessages) => {
+             const updateMap = new Map(payload.map((u: any) => [u.messageId, u.unreadCount]));
+             return prevMessages.map((msg) => {
+               const newCount = updateMap.get(msg.id);
+               return newCount !== undefined ? { ...msg, unreadCount: newCount } : msg;
+             });
+           });
+           return;
+        }
         
         // 방 폐쇄 이벤트 처리
         if (payload.type === "ROOM_CLOSED") {
