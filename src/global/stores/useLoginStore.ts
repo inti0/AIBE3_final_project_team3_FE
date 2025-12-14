@@ -27,6 +27,7 @@ export const useLoginStore = create<LoginState>()(
               : null;
 
         set((prev) => ({
+          ...prev,
           accessToken: token,
           role,
           accountEmail: decodedEmail ?? prev.accountEmail ?? null,

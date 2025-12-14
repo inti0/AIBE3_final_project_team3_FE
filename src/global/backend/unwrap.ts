@@ -1,8 +1,8 @@
 import { FetchResponse } from "openapi-fetch";
 
 // unwrap.ts
-export const unwrap = async <T = unknown, TError = unknown, TStatus extends `${string}/${string}` = `${string}/${string}`>(
-  response: FetchResponse<any, TError, TStatus>
+export const unwrap = async <T = any>(
+  response: any
 ): Promise<T> => {
   // 1. 백엔드가 4xx, 5xx 에러를 보내면 response.error 객체가 생성됨.
   // 이 객체를 사용해 명시적인 에러를 발생시킨다.

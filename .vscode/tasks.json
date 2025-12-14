@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Stop Next.js dev (if running)",
+			"type": "shell",
+			"command": "echo Skipping stop; use your terminal to restart dev after config change",
+			"isBackground": false
+		}
+	]
+}

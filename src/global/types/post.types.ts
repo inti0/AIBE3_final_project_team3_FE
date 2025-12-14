@@ -26,6 +26,7 @@ export interface PostDetail {
   imageUrls: string[];
   viewCount: number;
   likeCount: number;
+  isLiked: boolean;
   createdAt: string;
   modifiedAt: string;
 }
@@ -39,6 +40,8 @@ export interface PostCreateRequest {
 export interface PostUpdateRequest {
   title: string;
   content: string;
+  /** 기존 이미지 전체 삭제 여부 (백엔드: multipart/form-data removeImages) */
+  removeImages?: boolean;
   images?: File[];
 }
 

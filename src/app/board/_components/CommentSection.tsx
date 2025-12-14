@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Comment, CommentCreateRequest } from '@/global/types/post.types';
 import {
   useCommentsQuery,
@@ -16,6 +17,7 @@ interface CommentSectionProps {
 }
 
 export default function CommentSection({ postId }: CommentSectionProps) {
+  const { t, language } = useLanguage();
   const { data: comments, isLoading } = useCommentsQuery(postId);
   const createCommentMutation = useCreateCommentMutation(postId);
   const [newComment, setNewComment] = useState('');
@@ -51,7 +53,8 @@ export default function CommentSection({ postId }: CommentSectionProps) {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
+    const locale = language === 'ko' ? 'ko-KR' : 'en-US';
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -60,14 +63,18 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     });
   };
 
+  const totalComments = comments?.reduce((acc, comment) => {
+    return acc + 1 + (comment.replies?.length || 0);
+  }, 0) || 0;
+
   if (isLoading) {
-    return <div className="text-center py-4">댓글 로딩 중...</div>;
+    return <div className="text-center py-4">{t('board.comments.loading')}</div>;
   }
 
   return (
     <div className="mt-8">
       <h3 className="text-xl font-bold mb-4">
-        댓글 {comments?.length || 0}개
+        {t('board.comments.title', { count: String(totalComments) })}
       </h3>
 
       {/* 댓글 작성 */}
@@ -75,7 +82,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
         <textarea
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          placeholder="댓글을 작성하세요..."
+          placeholder={t('board.comments.newPlaceholder')}
           className="w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
           style={{ background: 'var(--surface-field)', borderColor: 'var(--surface-border)', color: 'var(--page-text)' }}
           rows={3}
@@ -86,7 +93,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
             disabled={!newComment.trim() || createCommentMutation.isPending}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
-            댓글 작성
+            {t('board.comments.create')}
           </button>
         </div>
       </div>
@@ -99,6 +106,8 @@ export default function CommentSection({ postId }: CommentSectionProps) {
             comment={comment}
             postId={postId}
             currentUserId={member?.id}
+            t={t}
+            locale={language === 'ko' ? 'ko-KR' : 'en-US'}
             replyTo={replyTo}
             setReplyTo={setReplyTo}
             replyContent={replyContent}
@@ -120,6 +129,8 @@ interface CommentItemProps {
   postId: number;
   currentUserId?: number;
   isReply?: boolean;
+  t: (key: string, params?: Record<string, string>) => string;
+  locale: string;
   replyTo: number | null;
   setReplyTo: (id: number | null) => void;
   replyContent: string;
@@ -136,6 +147,8 @@ function CommentItem({
   postId,
   currentUserId,
   isReply = false,
+  t,
+  locale,
   replyTo,
   setReplyTo,
   replyContent,
@@ -164,7 +177,7 @@ function CommentItem({
   };
 
   const handleDelete = async () => {
-    if (confirm('댓글을 삭제하시겠습니까?')) {
+    if (confirm(t('board.comments.confirmDelete'))) {
       await deleteCommentMutation.mutateAsync(comment.id);
     }
   };
@@ -176,7 +189,7 @@ function CommentItem({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -196,8 +209,8 @@ function CommentItem({
             <span className="text-sm text-gray-500 ml-2">
               {formatDate(comment.createdAt)}
             </span>
-            {comment.createdAt !== comment.modifiedAt && (
-              <span className="text-xs text-gray-400 ml-1">(수정됨)</span>
+            {new Date(comment.createdAt).getTime() !== new Date(comment.modifiedAt).getTime() && (
+                <span className="text-xs text-gray-400 ml-1">{t('board.comments.edited')}</span>
             )}
           </div>
         </div>
@@ -216,7 +229,7 @@ function CommentItem({
                 onClick={handleSaveEdit}
                 className="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
               >
-                저장
+                {t('board.comments.save')}
               </button>
               <button
                 onClick={() => {
@@ -225,7 +238,7 @@ function CommentItem({
                 }}
                 className="px-4 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
               >
-                취소
+                {t('board.comments.cancel')}
               </button>
             </div>
           </div>
@@ -235,7 +248,8 @@ function CommentItem({
             <div className="flex gap-4 text-sm">
               <button
                 onClick={handleLike}
-                className={`${isLiked ? 'text-red-500' : 'text-gray-500'} hover:text-red-600`}
+                style={{ color: isLiked ? 'var(--accent-color)' : 'var(--page-text-muted)' }}
+                className="hover:text-red-600"
               >
                 ❤️ {comment.likeCount}
               </button>
@@ -244,7 +258,7 @@ function CommentItem({
                   onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
                   className="text-gray-500 hover:text-blue-600"
                 >
-                  답글
+                  {t('board.comments.reply')}
                 </button>
               )}
               {isOwner && (
@@ -253,13 +267,13 @@ function CommentItem({
                     onClick={handleEdit}
                     className="text-gray-500 hover:text-blue-600"
                   >
-                    수정
+                    {t('board.comments.edit')}
                   </button>
                   <button
                     onClick={handleDelete}
                     className="text-gray-500 hover:text-red-600"
                   >
-                    삭제
+                    {t('board.comments.delete')}
                   </button>
                 </>
               )}
@@ -273,7 +287,7 @@ function CommentItem({
             <textarea
               value={replyContent}
               onChange={(e) => setReplyContent(e.target.value)}
-              placeholder="답글을 작성하세요..."
+              placeholder={t('board.comments.replyPlaceholder')}
               className="w-full p-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
               style={{ background: 'var(--surface-field)', borderColor: 'var(--surface-border)', color: 'var(--page-text)' }}
               rows={2}
@@ -284,7 +298,7 @@ function CommentItem({
                 disabled={!replyContent.trim()}
                 className="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
               >
-                답글 작성
+                {t('board.comments.createReply')}
               </button>
               <button
                 onClick={() => {
@@ -293,7 +307,7 @@ function CommentItem({
                 }}
                 className="px-4 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
               >
-                취소
+                {t('board.comments.cancel')}
               </button>
             </div>
           </div>
@@ -310,6 +324,8 @@ function CommentItem({
               postId={postId}
               currentUserId={currentUserId}
               isReply={true}
+              t={t}
+              locale={locale}
               replyTo={replyTo}
               setReplyTo={setReplyTo}
               replyContent={replyContent}

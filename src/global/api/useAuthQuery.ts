@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation"; // Next.js 라우터 훅
 
 import client from "../backend/client"; // openapi-fetch 클라이언트
-import type { paths } from "../backend/schema"; // openapi-typescript로 생성된 타입
+import type { components, paths } from "../backend/schema"; // openapi-typescript로 생성된 타입
 import { unwrap } from "../backend/unwrap"; // 응답 처리 헬퍼
 import { isAllowedPath } from "../lib/utils"; // 유틸리티 함수
 import { useLoginStore } from "../stores/useLoginStore"; // Zustand 로그인 스토어
@@ -12,10 +12,31 @@ import { MemberSummaryResp, UserJoinReqBody, UserLoginReqBody } from "../types/a
 // --- 1. 순수 API 호출 함수 정의 ---
 // openapi-fetch 클라이언트의 타입은 paths['/api/v1/auth/login']['post'] 등으로 접근합니다.
 
-// 내 정보 조회
-const me = async () => {
-  const response = await client.GET("/api/v1/members/me", {}); // 실제 API 경로 확인 필요
-  return unwrap<MemberSummaryResp>(response);
+type MyProfileResp = components["schemas"]["MyProfileResp"];
+
+// 내 정보 조회 (401 등 에러는 null로 처리하여 전역 부트스트랩에 사용)
+// 백엔드 응답은 MyProfileResp(memberId) 기반이므로 MemberSummaryResp(id)로 매핑한다.
+const me = async (): Promise<MemberSummaryResp | null> => {
+  const response = await client.GET("/api/v1/members/me", {});
+  if (response.error) {
+    return null;
+  }
+
+  const payload = response.data as { data?: MyProfileResp } | undefined;
+  const profile = payload?.data;
+  if (!profile) {
+    return null;
+  }
+
+  return {
+    id: profile.memberId,
+    nickname: profile.nickname,
+    country: profile.country,
+    englishLevel: profile.englishLevel,
+    interests: profile.interests,
+    description: profile.description,
+    profileImageUrl: profile.profileImageUrl ?? "",
+  };
 };
 
 // 로그인
@@ -48,11 +69,11 @@ export const authQueryKeys = createQueryKeys("auth", {
 
 // 내 정보 조회 훅
 export const useFetchMe = () => {
-  const { accessToken } = useLoginStore(); // 토큰이 있어야만 요청하도록
+  const { hasHydrated } = useLoginStore();
   return useQuery({
     queryKey: authQueryKeys.me().queryKey,
     queryFn: me,
-    enabled: !!accessToken, // accessToken이 있을 때만 쿼리 실행
+    enabled: hasHydrated, // 토큰이 없어도 호출 -> 401이면 reissue 시도 가능
     staleTime: 5 * 60 * 1000, // 5분 동안 fresh 상태 유지
     gcTime: 10 * 60 * 1000, // 10분 동안 캐시 유지
     retry: 0, // 실패 시 재시도 안함

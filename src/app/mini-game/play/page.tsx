@@ -284,7 +284,7 @@ function MiniGamePlayContent() {
                     <p className="font-semibold text-[var(--text-primary)] mb-2">피드백:</p>
 
                     <ul className="space-y-3">
-                      {submitMutation.data.feedbacks.map((fb, idx) => (
+                      {submitMutation.data.feedbacks.map((fb: { tag?: string; problem?: string; correction?: string; extra?: string }, idx: number) => (
                         <li
                           key={idx}
                           className="theme-panel border rounded-md p-3 shadow-sm"

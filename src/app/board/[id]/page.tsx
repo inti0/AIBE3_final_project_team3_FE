@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, use } from 'react';
+import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
   usePostQuery,
   useDeletePostMutation,
   useTogglePostLikeMutation,
 } from '@/global/api/usePostQuery';
+import { useFetchMe } from '@/global/api/useAuthQuery';
 import CommentSection from '@/app/board/_components/CommentSection';
 import { useLoginStore } from '@/global/stores/useLoginStore';
 
@@ -19,18 +21,20 @@ interface PostDetailPageProps {
 }
 
 export default function PostDetailPage({ params }: PostDetailPageProps) {
+  const { t, language } = useLanguage();
   const { id } = use(params);
   const postId = parseInt(id);
   const router = useRouter();
   const { data: post, isLoading, error } = usePostQuery(postId);
   const deletePostMutation = useDeletePostMutation();
-  const toggleLikeMutation = useTogglePostLikeMutation(postId);
-  const [isLiked, setIsLiked] = useState(false);
+  const { mutate: toggleLike } = useTogglePostLikeMutation(postId);
   const member = useLoginStore((state) => state.member);
+  const { data: meData } = useFetchMe();
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
+    const locale = language === 'ko' ? 'ko-KR' : 'en-US';
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -40,21 +44,22 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
   };
 
   const handleDelete = async () => {
-    if (confirm('게시글을 삭제하시겠습니까?')) {
+    if (confirm(t('board.detail.confirmDelete'))) {
       await deletePostMutation.mutateAsync(postId);
       router.push('/board');
     }
   };
 
-  const handleLike = async () => {
-    await toggleLikeMutation.mutateAsync(isLiked);
-    setIsLiked(!isLiked);
+  const handleLike = () => {
+    if (post) {
+      toggleLike(post.isLiked);
+    }
   };
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="text-lg">로딩 중...</div>
+        <div className="text-lg">{t('board.detail.loading')}</div>
       </div>
     );
   }
@@ -64,21 +69,24 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-lg text-red-500">
-          게시글을 불러오는데 실패했습니다.
-          {error && <div className="text-sm mt-2">에러: {error.message}</div>}
+          {t('board.detail.error')}
+          {error && (
+            <div className="text-sm mt-2">{t('board.detail.errorDetail', { message: error.message })}</div>
+          )}
         </div>
       </div>
     );
   }
 
-  const isOwner = member?.id === post.authorId;
+  const currentUserId = meData?.id ?? member?.id;
+  const isOwner = currentUserId != null && post.authorId != null && currentUserId === post.authorId;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* 뒤로가기 */}
       <div className="mb-4">
         <Link href="/board" className="text-blue-600 hover:text-blue-800">
-          ← 목록으로
+          {t('board.detail.backToList')}
         </Link>
       </div>
 
@@ -91,12 +99,12 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
             <div className="flex gap-4">
               <span className="font-semibold">{post.authorNickname}</span>
               <span>{formatDate(post.createdAt)}</span>
-              {post.createdAt !== post.modifiedAt && (
-                <span className="text-gray-400">(수정됨)</span>
+              {new Date(post.createdAt).getTime() !== new Date(post.modifiedAt).getTime() && (
+                <span className="text-gray-400">{t('board.detail.modified', { date: formatDate(post.modifiedAt) })}</span>
               )}
             </div>
             <div className="flex gap-4">
-              <span>조회 {post.viewCount}</span>
+              <span>{t('board.detail.views', { count: String(post.viewCount) })}</span>
               <span>❤️ {post.likeCount}</span>
             </div>
           </div>
@@ -130,12 +138,18 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
           <button
             onClick={handleLike}
             className={`flex items-center gap-2 px-8 py-3 rounded-lg transition ${
-              isLiked
+              post.isLiked
                 ? 'bg-red-100 text-red-600 border-2 border-red-600'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
+            style={{
+              background: post.isLiked ? 'var(--accent-color-muted)' : 'var(--surface-muted)',
+              color: post.isLiked ? 'var(--accent-color)' : 'var(--page-text-muted)',
+              borderColor: post.isLiked ? 'var(--accent-color)' : 'var(--surface-border)',
+            }}
           >
             <span className="text-2xl">❤️</span>
+            <span className="font-semibold">{post.isLiked ? t('board.detail.unlike') : t('board.detail.like')}</span>
             <span className="font-semibold">{post.likeCount}</span>
           </button>
         </div>
@@ -147,14 +161,14 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
               href={`/board/edit/${postId}`}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
-              수정
+              {t('board.detail.edit')}
             </Link>
             <button
               onClick={handleDelete}
               disabled={deletePostMutation.isPending}
               className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition"
             >
-              삭제
+              {t('board.detail.delete')}
             </button>
           </div>
         )}

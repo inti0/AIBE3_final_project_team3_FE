@@ -1,0 +1,117 @@
+{
+  "list": {
+    "title": "게시판",
+    "write": "글쓰기",
+    "loading": "로딩 중...",
+    "error": "게시글을 불러오는데 실패했습니다.",
+    "errorDetail": "에러: {message}",
+    "empty": "게시글이 없습니다.",
+    "modified": "수정: {date}",
+    "views": "조회 {count}",
+    "likes": "좋아요 {count}",
+    "pagination": {
+      "prev": "이전",
+      "next": "다음",
+      "pageWithTotal": "{current} / {total}"
+    }
+  },
+  "admin": {
+    "menu": {
+      "deletePost": "게시글 삭제"
+    },
+    "deleteModal": {
+      "title": "게시글 삭제",
+      "reasonLabel": "삭제 사유",
+      "cancel": "취소",
+      "confirm": "삭제하기",
+      "deletedToast": "게시글이 삭제되었습니다.",
+      "deleteFailedToast": "삭제 실패"
+    },
+    "deleteReasons": {
+      "ABUSE": "욕설/비방",
+      "INAPPROPRIATE": "부적절 표현",
+      "SPAM": "스팸/도배",
+      "ILLEGAL": "불법/유해 콘텐츠",
+      "ADULT": "음란물/청소년 유해",
+      "OTHER": "기타"
+    }
+  },
+  "detail": {
+    "backToList": "← 목록으로",
+    "loading": "로딩 중...",
+    "error": "게시글을 불러오는데 실패했습니다.",
+    "errorDetail": "에러: {message}",
+    "confirmDelete": "게시글을 삭제하시겠습니까?",
+    "views": "조회 {count}",
+    "likes": "좋아요 {count}",
+    "like": "좋아요",
+    "unlike": "좋아요 취소",
+    "edit": "수정",
+    "delete": "삭제",
+    "modified": "수정: {date}"
+  },
+  "write": {
+    "backToList": "← 목록으로",
+    "title": "게시글 작성",
+    "fields": {
+      "title": "제목",
+      "content": "내용",
+      "images": "이미지"
+    },
+    "placeholders": {
+      "title": "제목을 입력하세요",
+      "content": "내용을 입력하세요"
+    },
+    "cancel": "취소",
+    "submit": "작성하기",
+    "submitting": "작성 중...",
+    "alerts": {
+      "titleRequired": "제목을 입력해주세요.",
+      "contentRequired": "내용을 입력해주세요.",
+      "createFailed": "게시글 작성에 실패했습니다."
+    }
+  },
+  "edit": {
+    "back": "← 돌아가기",
+    "title": "게시글 수정",
+    "fields": {
+      "title": "제목",
+      "content": "내용",
+      "images": "이미지"
+    },
+    "placeholders": {
+      "title": "제목을 입력하세요",
+      "content": "내용을 입력하세요"
+    },
+    "cancel": "취소",
+    "submit": "수정하기",
+    "submitting": "수정 중...",
+    "alerts": {
+      "titleRequired": "제목을 입력해주세요.",
+      "contentRequired": "내용을 입력해주세요.",
+      "loadFailed": "게시글을 불러오지 못했습니다.",
+      "updateFailed": "게시글 수정에 실패했습니다."
+    },
+    "images": {
+      "removeAllLabel": "기존 이미지 모두 삭제",
+      "removeAllNotice": "저장 시 기존 이미지가 모두 삭제됩니다.",
+      "replaceNotice": "새 이미지가 추가되어 저장 시 기존 이미지가 모두 삭제됩니다.",
+      "pendingRemovalBadge": "삭제 예정"
+    }
+  },
+  "comments": {
+    "loading": "댓글 로딩 중...",
+    "title": "댓글 {count}개",
+    "newPlaceholder": "댓글을 작성하세요...",
+    "create": "댓글 작성",
+    "reply": "답글",
+    "edit": "수정",
+    "delete": "삭제",
+    "save": "저장",
+    "cancel": "취소",
+    "replyPlaceholder": "답글을 작성하세요...",
+    "createReply": "답글 작성",
+    "confirmDelete": "댓글을 삭제하시겠습니까?",
+    "edited": "(수정됨)"
+  }
+}

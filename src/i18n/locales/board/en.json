@@ -1,0 +1,117 @@
+{
+  "list": {
+    "title": "Board",
+    "write": "Write",
+    "loading": "Loading...",
+    "error": "Failed to load posts.",
+    "errorDetail": "Error: {message}",
+    "empty": "No posts yet.",
+    "modified": "Edited: {date}",
+    "views": "Views {count}",
+    "likes": "Likes {count}",
+    "pagination": {
+      "prev": "Previous",
+      "next": "Next",
+      "pageWithTotal": "{current} / {total}"
+    }
+  },
+  "admin": {
+    "menu": {
+      "deletePost": "Delete post"
+    },
+    "deleteModal": {
+      "title": "Delete post",
+      "reasonLabel": "Reason",
+      "cancel": "Cancel",
+      "confirm": "Delete",
+      "deletedToast": "Post deleted.",
+      "deleteFailedToast": "Delete failed"
+    },
+    "deleteReasons": {
+      "ABUSE": "Harassment or abusive language",
+      "INAPPROPRIATE": "Inappropriate content",
+      "SPAM": "Spam",
+      "ILLEGAL": "Illegal or harmful content",
+      "ADULT": "Adult content / minors unsafe",
+      "OTHER": "Other"
+    }
+  },
+  "detail": {
+    "backToList": "← Back to list",
+    "loading": "Loading...",
+    "error": "Failed to load post.",
+    "errorDetail": "Error: {message}",
+    "confirmDelete": "Delete this post?",
+    "views": "Views {count}",
+    "likes": "Likes {count}",
+    "like": "Like",
+    "unlike": "Unlike",
+    "edit": "Edit",
+    "delete": "Delete",
+    "modified": "Edited: {date}"
+  },
+  "write": {
+    "backToList": "← Back to list",
+    "title": "Write post",
+    "fields": {
+      "title": "Title",
+      "content": "Content",
+      "images": "Images"
+    },
+    "placeholders": {
+      "title": "Enter a title",
+      "content": "Write your content"
+    },
+    "cancel": "Cancel",
+    "submit": "Post",
+    "submitting": "Posting...",
+    "alerts": {
+      "titleRequired": "Please enter a title.",
+      "contentRequired": "Please enter content.",
+      "createFailed": "Failed to create the post."
+    }
+  },
+  "edit": {
+    "back": "← Back",
+    "title": "Edit post",
+    "fields": {
+      "title": "Title",
+      "content": "Content",
+      "images": "Images"
+    },
+    "placeholders": {
+      "title": "Enter a title",
+      "content": "Write your content"
+    },
+    "cancel": "Cancel",
+    "submit": "Save",
+    "submitting": "Saving...",
+    "alerts": {
+      "titleRequired": "Please enter a title.",
+      "contentRequired": "Please enter content.",
+      "loadFailed": "Could not load the post.",
+      "updateFailed": "Failed to update the post."
+    },
+    "images": {
+      "removeAllLabel": "Remove all existing images",
+      "removeAllNotice": "All existing images will be removed when you save.",
+      "replaceNotice": "New images were added, so existing images will be removed when you save.",
+      "pendingRemovalBadge": "Will be removed"
+    }
+  },
+  "comments": {
+    "loading": "Loading comments...",
+    "title": "Comments {count}",
+    "newPlaceholder": "Write a comment...",
+    "create": "Post comment",
+    "reply": "Reply",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "replyPlaceholder": "Write a reply...",
+    "createReply": "Post reply",
+    "confirmDelete": "Delete this comment?",
+    "edited": "(edited)"
+  }
+}

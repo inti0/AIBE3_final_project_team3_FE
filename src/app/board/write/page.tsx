@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useCreatePostMutation } from '@/global/api/usePostQuery';
 
 export default function WritePostPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const createPostMutation = useCreatePostMutation();
   const [title, setTitle] = useState('');
@@ -19,11 +21,14 @@ export default function WritePostPage() {
     if (!files) return;
 
     const newImages = Array.from(files);
-    setImages([...images, ...newImages]);
+    setImages((prev) => [...prev, ...newImages]);
 
     // 미리보기 URL 생성
     const newPreviewUrls = newImages.map((file) => URL.createObjectURL(file));
-    setPreviewUrls([...previewUrls, ...newPreviewUrls]);
+    setPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
+
+    // 같은 파일을 다시 선택할 수 있도록 초기화
+    e.target.value = '';
   };
 
   const removeImage = (index: number) => {
@@ -41,12 +46,12 @@ export default function WritePostPage() {
     e.preventDefault();
 
     if (!title.trim()) {
-      alert('제목을 입력해주세요.');
+      alert(t('board.write.alerts.titleRequired'));
       return;
     }
 
     if (!content.trim()) {
-      alert('내용을 입력해주세요.');
+      alert(t('board.write.alerts.contentRequired'));
       return;
     }
 
@@ -61,7 +66,7 @@ export default function WritePostPage() {
         router.push(`/board/${result.id}`);
       }
     } catch (error) {
-      alert('게시글 작성에 실패했습니다.');
+      alert(t('board.write.alerts.createFailed'));
     }
   };
 
@@ -69,24 +74,24 @@ export default function WritePostPage() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-4">
         <Link href="/board" className="text-blue-600 hover:text-blue-800">
-          ← 목록으로
+          {t('board.write.backToList')}
         </Link>
       </div>
 
       <div className="border rounded-lg p-8" style={{ background: 'var(--surface-panel)', borderColor: 'var(--surface-border)' }}>
-        <h1 className="text-3xl font-bold mb-6">게시글 작성</h1>
+        <h1 className="text-3xl font-bold mb-6">{t('board.write.title')}</h1>
 
         <form onSubmit={handleSubmit}>
           {/* 제목 */}
           <div className="mb-6">
             <label className="block text-sm font-semibold mb-2">
-              제목 <span className="text-red-500">*</span>
+              {t('board.write.fields.title')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="제목을 입력하세요"
+              placeholder={t('board.write.placeholders.title')}
               maxLength={255}
               className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -98,12 +103,12 @@ export default function WritePostPage() {
           {/* 내용 */}
           <div className="mb-6">
             <label className="block text-sm font-semibold mb-2">
-              내용 <span className="text-red-500">*</span>
+              {t('board.write.fields.content')} <span className="text-red-500">*</span>
             </label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="내용을 입력하세요"
+              placeholder={t('board.write.placeholders.content')}
               maxLength={10000}
               rows={15}
               className="w-full px-4 py-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -115,7 +120,7 @@ export default function WritePostPage() {
 
           {/* 이미지 업로드 */}
           <div className="mb-6">
-            <label className="block text-sm font-semibold mb-2">이미지</label>
+            <label className="block text-sm font-semibold mb-2">{t('board.write.fields.images')}</label>
             <input
               type="file"
               accept="image/*"
@@ -154,14 +159,14 @@ export default function WritePostPage() {
               href="/board"
               className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
             >
-              취소
+              {t('board.write.cancel')}
             </Link>
             <button
               type="submit"
               disabled={createPostMutation.isPending}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
-              {createPostMutation.isPending ? '작성 중...' : '작성하기'}
+              {createPostMutation.isPending ? t('board.write.submitting') : t('board.write.submit')}
             </button>
           </div>
         </form>

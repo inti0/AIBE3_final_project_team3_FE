@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import ThemeToggle from "@/components/ThemeToggle";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useLogout } from "@/global/api/useAuthQuery";
+import { useFetchMe, useLogout } from "@/global/api/useAuthQuery";
 import { useAcceptFriendRequest, useRejectFriendRequest } from "@/global/api/useFriendshipMutation";
 import {
   useDeleteAllNotifications,
@@ -139,6 +139,15 @@ export default function Header() {
   }, []);
 
   const { role } = useLoginStore();
+
+  const setMember = useLoginStore((state) => state.setMember);
+  const { data: meData } = useFetchMe();
+
+  useEffect(() => {
+    if (meData) {
+      setMember(meData);
+    }
+  }, [meData, setMember]);
 
   const formatTimeAgo = (timestamp: string) => {
     const date = new Date(timestamp);

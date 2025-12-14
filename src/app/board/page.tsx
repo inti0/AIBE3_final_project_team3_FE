@@ -1,27 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { usePostsQuery } from "@/global/api/usePostQuery";
 import { PostSortType } from "@/global/types/post.types";
 import { useAdminPostDeleteMutation } from "@/global/hooks/useAdminPostDeleteMutation";
 import { useToastStore } from "@/global/stores/useToastStore";
 import { useLoginStore } from "@/global/stores/useLoginStore"; // ✅ 관리자 검증
 
-// 🔵 삭제 이유 선택 옵션
-const DELETE_REASONS = [
-  { code: 1, label: "욕설/비방" },
-  { code: 2, label: "부적절 표현" },
-  { code: 3, label: "스팸/도배" },
-  { code: 4, label: "불법/유해 콘텐츠" },
-  { code: 5, label: "음란물/청소년 유해" },
-  { code: 99, label: "기타" },
-];
-
 export default function BoardListPage() {
+  const { t, language } = useLanguage();
   const [sort, setSort] = useState<PostSortType>(PostSortType.LATEST);
   const [page, setPage] = useState(0);
-  const { data, isLoading, error } = usePostsQuery(sort, page, 20);
+  const pageSize = 20;
+  const { data, isLoading, error } = usePostsQuery(sort, page, pageSize);
+
+  const totalPages = Math.max(1, data?.totalPages ?? 1);
+
+  useEffect(() => {
+    if (!data) return;
+    if (page > totalPages - 1) {
+      setPage(Math.max(0, totalPages - 1));
+    }
+  }, [data, page, totalPages]);
 
   const { addToast } = useToastStore();
   const deleteMutation = useAdminPostDeleteMutation();
@@ -33,9 +35,20 @@ export default function BoardListPage() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [reasonCode, setReasonCode] = useState<number>(1);
 
+  // 🔵 삭제 이유 선택 옵션
+  const DELETE_REASONS = [
+    { code: 1, label: t("board.admin.deleteReasons.ABUSE") },
+    { code: 2, label: t("board.admin.deleteReasons.INAPPROPRIATE") },
+    { code: 3, label: t("board.admin.deleteReasons.SPAM") },
+    { code: 4, label: t("board.admin.deleteReasons.ILLEGAL") },
+    { code: 5, label: t("board.admin.deleteReasons.ADULT") },
+    { code: 99, label: t("board.admin.deleteReasons.OTHER") },
+  ];
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("ko-KR", {
+    const locale = language === "ko" ? "ko-KR" : "en-US";
+    return date.toLocaleDateString(locale, {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -54,11 +67,11 @@ export default function BoardListPage() {
       { postId: deleteTarget, reasonCode },
       {
         onSuccess: () => {
-          addToast("게시글이 삭제되었습니다.", "success");
+          addToast(t("board.admin.deleteModal.deletedToast"), "success");
           setDeleteTarget(null);
         },
         onError: (err: any) => {
-          addToast(err.message || "삭제 실패", "error");
+          addToast(err.message || t("board.admin.deleteModal.deleteFailedToast"), "error");
         },
       }
     );
@@ -67,7 +80,7 @@ export default function BoardListPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="text-lg">로딩 중...</div>
+        <div className="text-lg">{t("board.list.loading")}</div>
       </div>
     );
   }
@@ -77,8 +90,8 @@ export default function BoardListPage() {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-lg text-red-500">
-          게시글을 불러오는데 실패했습니다.
-          <div className="text-sm mt-2">에러: {error.message}</div>
+          {t("board.list.error")}
+          <div className="text-sm mt-2">{t("board.list.errorDetail", { message: error.message })}</div>
         </div>
       </div>
     );
@@ -88,12 +101,12 @@ export default function BoardListPage() {
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">게시판</h1>
+        <h1 className="text-3xl font-bold">{t("board.list.title")}</h1>
         <Link
           href="/board/write"
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
-          글쓰기
+          {t("board.list.write")}
         </Link>
       </div>
 
@@ -135,9 +148,12 @@ export default function BoardListPage() {
                   <div className="flex gap-4">
                     <span>{post.authorNickname}</span>
                     <span>{formatDate(post.createdAt)}</span>
+                    {new Date(post.createdAt).getTime() !== new Date(post.modifiedAt).getTime() && (
+                      <span className="text-gray-400">{t("board.list.modified", { date: formatDate(post.modifiedAt) })}</span>
+                    )}
                   </div>
                   <div className="flex gap-4">
-                    <span>조회 {post.viewCount}</span>
+                    <span>{t("board.list.views", { count: String(post.viewCount) })}</span>
                     <span>❤️ {post.likeCount}</span>
                   </div>
                 </div>
@@ -155,7 +171,7 @@ export default function BoardListPage() {
                     }}
                     className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600"
                   >
-                    게시글 삭제
+                    {t("board.admin.menu.deletePost")}
                   </button>
                 </div>
               )}
@@ -163,16 +179,53 @@ export default function BoardListPage() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 text-gray-500">게시글이 없습니다.</div>
+          <div className="text-center py-12 text-gray-500">{t("board.list.empty")}</div>
+      )}
+
+      {/* 페이지네이션 (게시글 개수가 적어도 항상 표시) */}
+      {data && (
+        <div className="flex justify-center items-center gap-3 mt-8">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page <= 0}
+            className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: 'var(--surface-panel)',
+              borderColor: 'var(--surface-border)',
+              color: 'var(--page-text)',
+            }}
+          >
+            {t("board.list.pagination.prev")}
+          </button>
+
+          <span className="text-sm" style={{ color: 'var(--page-text-muted)' }}>
+            {t("board.list.pagination.pageWithTotal", { current: String(page + 1), total: String(totalPages) })}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: 'var(--surface-panel)',
+              borderColor: 'var(--surface-border)',
+              color: 'var(--page-text)',
+            }}
+          >
+            {t("board.list.pagination.next")}
+          </button>
+        </div>
       )}
 
       {/* 🔥 삭제 모달 (관리자가 삭제 버튼 눌렀을 때만 deleteTarget 세팅됨) */}
       {isAdmin && deleteTarget && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96">
-            <h2 className="text-xl font-bold mb-4">게시글 삭제</h2>
+            <h2 className="text-xl font-bold mb-4">{t("board.admin.deleteModal.title")}</h2>
 
-            <label className="block text-sm font-semibold mb-2">삭제 사유</label>
+            <label className="block text-sm font-semibold mb-2">{t("board.admin.deleteModal.reasonLabel")}</label>
             <select
               value={reasonCode}
               onChange={(e) => setReasonCode(Number(e.target.value))}
@@ -190,14 +243,14 @@ export default function BoardListPage() {
                 onClick={() => setDeleteTarget(null)}
                 className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
               >
-                취소
+                {t("board.admin.deleteModal.cancel")}
               </button>
 
             <button
                 onClick={handleDelete}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
-                삭제하기
+                {t("board.admin.deleteModal.confirm")}
               </button>
             </div>
           </div>

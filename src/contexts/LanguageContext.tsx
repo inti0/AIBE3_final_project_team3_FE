@@ -13,6 +13,8 @@ import findEn from "../i18n/locales/find/en.json";
 import findKo from "../i18n/locales/find/ko.json";
 import learningNotesEn from "../i18n/locales/learningNotes/en.json";
 import learningNotesKo from "../i18n/locales/learningNotes/ko.json";
+import boardEn from "../i18n/locales/board/en.json";
+import boardKo from "../i18n/locales/board/ko.json";
 import profileEn from "../i18n/locales/profile/en.json";
 import profileKo from "../i18n/locales/profile/ko.json";
 
@@ -23,6 +25,7 @@ type Translations = typeof commonKo & {
   chat: typeof chatKo;
   find: typeof findKo;
   learningNotes: typeof learningNotesKo;
+  board: typeof boardKo;
   profile: typeof profileKo;
 };
 
@@ -34,6 +37,7 @@ const translations: Record<Language, Translations> = {
     chat: chatKo,
     find: findKo,
     learningNotes: learningNotesKo,
+    board: boardKo,
     profile: profileKo,
   },
   en: {
@@ -43,6 +47,7 @@ const translations: Record<Language, Translations> = {
     chat: chatEn,
     find: findEn,
     learningNotes: learningNotesEn,
+    board: boardEn,
     profile: profileEn,
   },
 };
