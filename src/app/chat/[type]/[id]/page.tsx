@@ -192,6 +192,12 @@ export default function ChatRoomPage() {
         }
         // 4. 일반 메시지 처리
         else {
+          // RoomLastMessageUpdateResp 등이 같은 토픽으로 올 수 있으므로 id가 없으면 무시
+          if (!payload.id) {
+             console.log('[WebSocket] Ignoring non-message payload (likely RoomLastMessageUpdateResp):', payload);
+             return;
+          }
+
           const receivedMessage = payload as MessageResp;
           console.log(`[WebSocket] Received message:`, receivedMessage);
           setMessages((prevMessages) => {

@@ -272,17 +272,31 @@ export default function ChatWindow({
   ];
 
   const menuItems = roomDetails.type === 'group' ? groupMenuItems : directMenuItems;
+  const normalizeMemberId = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return null;
+  };
+
   const resolvedMemberId = (() => {
     if (!member) {
       return null;
     }
 
-    const rawMemberId = (member as { memberId?: unknown }).memberId;
-    if (typeof rawMemberId === "number") {
+    const rawMemberId = normalizeMemberId((member as { memberId?: unknown }).memberId);
+    if (rawMemberId !== null) {
       return rawMemberId;
     }
 
-    return typeof member.id === "number" ? member.id : null;
+    const fallbackId = normalizeMemberId((member as { id?: unknown }).id);
+    return fallbackId;
   })();
 
   // 그룹 채팅방이면 상세 데이터의 ownerId 사용
@@ -301,6 +315,26 @@ export default function ChatWindow({
     return t('chat.ui.participants_count', { count: subscriberCount.toString(), total: totalMemberCount.toString() });
   })();
   // --- End Dynamic Menu Items ---
+
+  const loggedInNickname = typeof member?.nickname === "string" ? member.nickname : null;
+  const directPartner = roomDetails?.type === 'direct' && Array.isArray(roomDetails.members)
+    ? ((roomDetails.members as ChatRoomMember[]).find((m) => {
+        const candidateId = normalizeMemberId(m.id);
+        if (resolvedMemberId !== null) {
+          return candidateId !== null && candidateId !== resolvedMemberId;
+        }
+        if (loggedInNickname) {
+          return m.nickname !== loggedInNickname;
+        }
+        return true;
+      }) ?? (roomDetails.members as ChatRoomMember[])[0])
+    : null;
+
+  const headerDisplayName = roomDetails
+    ? roomDetails.type === 'direct'
+      ? directPartner?.nickname || roomDetails.name
+      : roomDetails.name
+    : "";
 
   return (
     <main
@@ -329,12 +363,12 @@ export default function ChatWindow({
                   colors={["#92A1C6", "#146A7C", "#F0AB3D", "#C271B4", "#C20D90"]}
                 />
               ) : (
-                roomDetails.avatar
+                directPartner?.profileImageUrl || roomDetails.avatar
               )}
             </div>
           </div>
           <div className="ml-4 min-w-0 text-left">
-            <h2 className="font-semibold text-white truncate group-hover:text-emerald-400 transition-colors">{roomDetails.name}</h2>
+            <h2 className="font-semibold text-white truncate group-hover:text-emerald-400 transition-colors">{headerDisplayName}</h2>
             {roomStatusLabel && (
               <p className="text-xs text-gray-400">{roomStatusLabel}</p>
             )}
@@ -440,7 +474,8 @@ export default function ChatWindow({
               return (
                 <div key={messageKey} className={`flex items-start gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
                   {!isUser && (() => {
-                    const senderMember = roomDetails?.members?.find((m: ChatRoomMember) => m.id === msg.senderId);
+                    const activeMembers = isGroupChat ? groupDetailData?.members : roomDetails?.members;
+                    const senderMember = activeMembers?.find((m: ChatRoomMember) => m.id === msg.senderId);
                     const hasProfileImage = Boolean(senderMember?.profileImageUrl && senderMember.profileImageUrl.trim() !== "");
                     const senderMemberId = typeof senderMember?.id === "number" ? senderMember.id : null;
                     const shouldShowFallback = !hasProfileImage || (senderMemberId != null && failedAvatarIds.has(senderMemberId));
@@ -589,6 +624,7 @@ export default function ChatWindow({
             ownerId={groupDetailData?.ownerId || 0}
             currentUserId={resolvedMemberId ?? 0}
             isOwner={isOwner}
+            onSelectMemberForProfile={setSelectedMemberForProfile} // Pass the function here
           />
           <InviteFriendModal
             isOpen={isInviteModalOpen}
@@ -614,13 +650,15 @@ export default function ChatWindow({
       {roomDetails?.type === 'direct' && member && (() => {
         // Find the partner (the other person in the direct chat)
         const safeMemberId = resolvedMemberId ?? undefined;
-        const partnerId = messages.find(msg => safeMemberId === undefined || msg.senderId !== safeMemberId)?.senderId;
+        const partnerIdFromMembers = normalizeMemberId(directPartner?.id);
+        const partnerId = partnerIdFromMembers ?? messages.find(msg => safeMemberId === undefined || msg.senderId !== safeMemberId)?.senderId;
+        const partnerName = directPartner?.nickname ?? roomDetails.name;
         return partnerId ? (
           <ReportModal
             isOpen={isReportModalOpen}
             onClose={() => setIsReportModalOpen(false)}
             targetMemberId={partnerId}
-            targetNickname={roomDetails.name}
+            targetNickname={partnerName}
           />
         ) : null;
       })()}
