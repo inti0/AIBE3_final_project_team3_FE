@@ -41,6 +41,7 @@ export default function ChatLayout({
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const userQueueSubscriptionRef = useRef<any>(null);
+  const activeRoomIdRef = useRef<string | null>(selectedRoomId);
 
   // 인증 체크: Hydration 완료 후 토큰이 없으면 로그인 페이지로 리다이렉트
   useEffect(() => {
@@ -48,6 +49,10 @@ export default function ChatLayout({
       router.replace("/auth/login");
     }
   }, [accessToken, hasHydrated, router]);
+
+  useEffect(() => {
+    activeRoomIdRef.current = selectedRoomId;
+  }, [selectedRoomId]);
 
   useEffect(() => {
     const parts = pathname.split('/');
@@ -94,10 +99,12 @@ export default function ChatLayout({
           console.log(`[Layout User Queue] Received message from ${message.headers.destination}:`, payload);
 
           // RoomLastMessageUpdateResp 처리
-          if (payload.chatRoomType && payload.latestSequence !== undefined) {
-            const update = payload as RoomLastMessageUpdateResp;
-            const roomType = update.chatRoomType.toLowerCase();
-            const cacheKey = ['chatRooms', roomType];
+            if (payload.chatRoomType && payload.latestSequence !== undefined) {
+              const update = payload as RoomLastMessageUpdateResp;
+              const roomType = update.chatRoomType.toLowerCase();
+              const cacheKey = ['chatRooms', roomType];
+              const activeRoomKey = `${roomType}-${update.roomId}`;
+              const isRoomCurrentlyOpen = activeRoomIdRef.current === activeRoomKey;
 
             console.log(`[Layout User Queue Update] Processing update for room ${update.roomId} (${roomType}), sender=${update.senderId}, seq=${update.latestSequence}`);
 
@@ -125,13 +132,17 @@ export default function ChatLayout({
                 // currentMemberId가 undefined이면(로딩중) 계산이 부정확할 수 있으나, 보통 로딩 후 구독됨.
                 const currentMyId = currentMemberId ?? resolveStoreMemberId(useLoginStore.getState().member);
 
-                if (update.senderId !== currentMyId) {
+                const isOwnMessage = update.senderId === currentMyId;
+                if (isOwnMessage) {
+                  unreadCount = 0;
+                  console.log(`[Layout User Queue Update] Room ${update.roomId} - own message, unreadCount=0`);
+                } else if (isRoomCurrentlyOpen) {
+                  unreadCount = 0;
+                  console.log(`[Layout User Queue Update] Room ${update.roomId} is currently open; keeping unreadCount=0`);
+                } else {
                   const lastReadSequence = room.lastReadSequence ?? 0;
                   unreadCount = Math.max(0, update.latestSequence - lastReadSequence);
                   console.log(`[Layout User Queue Update] Room ${update.roomId} unreadCount: ${unreadCount} (latestSeq=${update.latestSequence}, lastReadSeq=${lastReadSequence})`);
-                } else {
-                  unreadCount = 0;
-                  console.log(`[Layout User Queue Update] Room ${update.roomId} - own message, unreadCount=0`);
                 }
 
                 return {
