@@ -1,3 +1,3 @@
 export const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? "https://api.mixchat.site" 
+  ? "https://api.mixchat.inti0.shop" 
   : "http://localhost:8080";
